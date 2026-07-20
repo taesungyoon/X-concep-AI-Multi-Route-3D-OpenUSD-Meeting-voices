@@ -1,0 +1,22 @@
+functions:
+  xconcep_tools:
+    _type: xconcep_tools
+    worker_url: ${PYTHON_WORKER_URL}
+llms:
+  local_gemma:
+    _type: openai
+    model_name: ${GEMMA_MODEL_NAME}
+    base_url: ${VLLM_BASE_URL}
+    api_key: ${VLLM_API_KEY}
+    temperature: 0.1
+workflow:
+  _type: react_agent
+  tool_names:
+    - xconcep_tools__analyze_requirements
+    - xconcep_tools__generate_2d
+    - xconcep_tools__generate_3d
+    - xconcep_tools__transcribe_meeting
+    - xconcep_tools__patch_requirements
+  llm_name: local_gemma
+  verbose: true
+  handle_tool_errors: true

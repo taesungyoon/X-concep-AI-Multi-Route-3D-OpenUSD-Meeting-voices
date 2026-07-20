@@ -1,0 +1,20 @@
+Options -Indexes
+AddType model/gltf-binary .glb
+AddType model/stl .stl
+AddType application/octet-stream .stl .usdc .blend
+AddType text/plain .usda .scad
+AddType application/json .json
+
+<IfModule mod_headers.c>
+Header always set X-Content-Type-Options "nosniff"
+Header always set Referrer-Policy "same-origin"
+Header always set Permissions-Policy "microphone=(self), camera=()"
+Header always set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+RewriteEngine On
+RewriteRule ^storage/projects/[^/]+/(project\.json|analysis\.json|design_state\.json|generation_plan\.json|reference-contact-sheet\.png)$ - [F,L,NC]
+RewriteRule ^storage/projects/[^/]+/(uploads|meeting)(/|$) - [F,L,NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]

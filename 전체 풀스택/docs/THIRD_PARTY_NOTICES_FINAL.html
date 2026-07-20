@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>THIRD_PARTY_NOTICES_FINAL</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="final-doc.css" />
+</head>
+<body>
+<h1 id="제3자-구성요소-확인사항">제3자 구성요소 확인사항</h1>
+<p>본 파일은 법률 의견이 아니며 운영·배포 전 각 제품의 최신 라이선스와
+계약 조건을 확인해야 함.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>구성요소</th>
+<th>적용 위치</th>
+<th>확인사항</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>NVIDIA NeMo Agent Toolkit</td>
+<td>Agent Plugin·Runtime Profile</td>
+<td>Apache-2.0 계열 공개 저장소와 설치 Package 조건 확인함</td>
+</tr>
+<tr class="even">
+<td>NVIDIA NeMo Retriever Library</td>
+<td>선택 문서 추출 Profile</td>
+<td>26.5 Package·NVIDIA NIM 및 모델별 조건 확인함</td>
+</tr>
+<tr class="odd">
+<td>NVIDIA NeMo Toolkit ASR</td>
+<td>로컬 회의 전사·Diarization</td>
+<td>Model Card와 Weight License를 별도 확인함</td>
+</tr>
+<tr class="even">
+<td>NVIDIA NIM</td>
+<td>LLM·Embedding·Speech 선택 Profile</td>
+<td>NVIDIA AI Enterprise 또는 NIM별 사용 조건 확인함</td>
+</tr>
+<tr class="odd">
+<td>TensorRT-LLM</td>
+<td>선택 LLM Runtime</td>
+<td>공개 저장소 License와 모델 License를 함께 확인함</td>
+</tr>
+<tr class="even">
+<td>Triton Inference Server</td>
+<td>선택 Model Serving</td>
+<td>BSD 계열 공개 저장소와 NVIDIA Container 조건 확인함</td>
+</tr>
+<tr class="odd">
+<td>OpenUSD</td>
+<td>3D Layer·USDA·USDC</td>
+<td>Apache-2.0 License 확인함</td>
+</tr>
+<tr class="even">
+<td>NVIDIA Omniverse Kit / Nucleus</td>
+<td>RTX·검수·협업</td>
+<td>NGC·Enterprise 지원·배포 조건 확인함</td>
+</tr>
+<tr class="odd">
+<td>NVIDIA Isaac Sim</td>
+<td>선택 Simulation</td>
+<td>NVIDIA Omniverse License와 지원 Matrix 확인함</td>
+</tr>
+<tr class="even">
+<td>NVIDIA Cosmos</td>
+<td>선택 Physical AI Scenario</td>
+<td>Model·Weight·Dataset별 License 확인함</td>
+</tr>
+<tr class="odd">
+<td>DeepStream / Metropolis / TAO</td>
+<td>선택 Factory Vision</td>
+<td>SDK·Model·Container별 조건 확인함</td>
+</tr>
+<tr class="even">
+<td>Qdrant</td>
+<td>Vector DB</td>
+<td>Apache-2.0 공개 서버·Client 확인함</td>
+</tr>
+<tr class="odd">
+<td>Hunyuan3D</td>
+<td>로컬 3D 생성</td>
+<td>Community License·지역·상업 배포 조건 법무 검토함</td>
+</tr>
+<tr class="even">
+<td>GPT Image API</td>
+<td>외부 2D 생성</td>
+<td>OpenAI 이용약관·데이터 처리·과금 정책 확인함</td>
+</tr>
+<tr class="odd">
+<td>Three.js</td>
+<td>Web GLB Viewer</td>
+<td>MIT License 확인함</td>
+</tr>
+<tr class="even">
+<td>Django / DRF / FastAPI</td>
+<td>Web·API</td>
+<td>각 BSD/MIT License 확인함</td>
+</tr>
+</tbody>
+</table>
+<p>NeMo Retriever의 NVIDIA 검증 기본 VDB는 LanceDB이며, 본 전달본의
+Qdrant 경로는 사용자 정의 Adapter임. 해당 Adapter의 정확도·성능·호환성은
+운영자가 검증함.</p>
+</body>
+</html>

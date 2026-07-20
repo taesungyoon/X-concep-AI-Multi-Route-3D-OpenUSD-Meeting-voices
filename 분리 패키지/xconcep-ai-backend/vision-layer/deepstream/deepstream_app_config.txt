@@ -1,0 +1,4 @@
+[application]
+enable-perf-measurement=1
+perf-measurement-interval-sec=5
+# 실제 RTSP source, nvstreammux, nvinfer, nvmsgbroker 설정은 현장 카메라/TAO 모델에 맞춰 추가함.

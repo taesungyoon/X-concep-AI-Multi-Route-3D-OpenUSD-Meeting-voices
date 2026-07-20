@@ -1,0 +1,16 @@
+[package]
+version = "1.0.0"
+title = "X concep Meeting Review"
+description = "Loads layered OpenUSD packages, tracks meeting revisions, switches variants and exposes review controls."
+category = "X concep AI"
+authors = ["The Engineer Co., Ltd."]
+
+[dependencies]
+"omni.ui" = {}
+"omni.usd" = {}
+"omni.kit.app" = {}
+"omni.client.lib" = {}
+"omni.asset_validator.core" = {}
+
+[[python.module]]
+name = "xconcep.meeting.review"

@@ -1,0 +1,13 @@
+[build-system]
+requires=["setuptools>=69"]
+build-backend="setuptools.build_meta"
+[project]
+name="xconcep-nat-tools"
+version="0.1.0"
+description="X concep AI tools for NVIDIA NeMo Agent Toolkit"
+requires-python=">=3.11,<3.14"
+dependencies=["nvidia-nat>=1.8,<2","httpx>=0.28","pydantic>=2.11"]
+[project.entry-points."nat.plugins"]
+xconcep_tools="xconcep_nat.register"
+[tool.setuptools.packages.find]
+where=["src"]

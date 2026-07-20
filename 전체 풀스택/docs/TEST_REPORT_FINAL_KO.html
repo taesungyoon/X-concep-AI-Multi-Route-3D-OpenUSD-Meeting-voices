@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>X concep AI ������ ��������� ���������</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="final-doc.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">X concep AI ������ ��������� ���������</h1>
+</header>
+<h1 id="최종-테스트-보고서">최종 테스트 보고서</h1>
+<p>테스트 기준일: 2026-07-18</p>
+<h2 id="정적-검증">정적 검증</h2>
+<table>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Python compileall</td>
+<td>PASS</td>
+</tr>
+<tr class="even">
+<td>PHP 문법 검사</td>
+<td>PASS</td>
+</tr>
+<tr class="odd">
+<td>JavaScript 문법 검사</td>
+<td>PASS</td>
+</tr>
+<tr class="even">
+<td>Docker Compose YAML Parse</td>
+<td>PASS</td>
+</tr>
+<tr class="odd">
+<td>NeMo Agent Workflow YAML Parse</td>
+<td>PASS</td>
+</tr>
+</tbody>
+</table>
+<h2 id="자동-테스트">자동 테스트</h2>
+<table>
+<thead>
+<tr class="header">
+<th>서비스</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>DRF Control Plane</td>
+<td>2 passed</td>
+</tr>
+<tr class="even">
+<td>Python AI Worker</td>
+<td>8 passed, 1 optional skipped</td>
+</tr>
+<tr class="odd">
+<td>Knowledge Service</td>
+<td>2 passed</td>
+</tr>
+<tr class="even">
+<td>Agent Gateway</td>
+<td>1 passed</td>
+</tr>
+</tbody>
+</table>
+<h2 id="local-end-to-end-mock">Local End-to-End Mock</h2>
+<ul>
+<li>DRF·Python Worker·Knowledge Service·Agent Gateway 실제 Server를
+기동함</li>
+<li>Prompt Project 생성과 2D 4안 생성을 확인함</li>
+<li>2D 선택 후 GLB·STL·PNG·USDA·USDC 생성을 확인함</li>
+<li>GLB를 Trimesh로 재로딩함</li>
+<li>USDA를 OpenUSD Parser로 열고 Default Prim과 13 Prim을 확인함</li>
+<li>회의 WAV Chunk 업로드·Mock 전사·Meeting Analysis·2D 4안 생성을
+확인함</li>
+<li>폭 900 mm 변경을 Dimension과 Requested Change로 구조화함</li>
+<li>높이 추후 확정을 Unresolved Item으로 구조화함</li>
+<li>문서 파일을 Knowledge Service에서 Chunk화하고 Qdrant 검색함</li>
+<li>API 응답에서 <code>/tmp/</code> 절대경로가 노출되지 않음을
+확인함</li>
+</ul>
+<h2 id="실행-환경-부재로-미검증">실행 환경 부재로 미검증</h2>
+<ul>
+<li>Docker Engine 전체 Image Build임</li>
+<li>실제 MySQL·Qdrant Container E2E임</li>
+<li>실제 NeMo Agent Toolkit Container Runtime임</li>
+<li>실제 NeMo Retriever GPU Extraction임</li>
+<li>실제 Gemma·GPT Image·Hunyuan3D·Speech Model임</li>
+<li>실제 Omniverse·Nucleus·WebRTC·Isaac Sim임</li>
+</ul>
+<h2 id="추가-확인-사항">추가 확인 사항</h2>
+<ul>
+<li>Omniverse Web Client TypeScript 소스 계약은 정적 검토했으나
+<code>@nvidia/ov-web-rtc</code> 패키지 설치와 Vite Production Build는
+현재 환경에서 실행하지 못함</li>
+<li>Docker CLI가 현재 환경에 없어 Docker Image Build와 Compose 실제
+Container 기동은 수행하지 못함</li>
+<li>위 두 항목은 운영 배포 체크리스트의 차단 조건으로 유지함</li>
+</ul>
+</body>
+</html>

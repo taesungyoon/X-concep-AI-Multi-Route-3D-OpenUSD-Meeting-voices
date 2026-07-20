@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>IMPLEMENTATION_STATUS_FINAL_KO</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="final-doc.css" />
+</head>
+<body>
+<h1 id="최종-구현-현황">최종 구현 현황</h1>
+<h2 id="실제-코드-구현-완료">실제 코드 구현 완료</h2>
+<ul>
+<li>PHP 반응형 UI·모바일임</li>
+<li>PHP → DRF Reverse Proxy임</li>
+<li>DRF Project·Job·Asset·Meeting·Transcript API임</li>
+<li>MySQL Production·SQLite Test 설정임</li>
+<li>Redis·Celery Async Profile임</li>
+<li>NeMo Agent Toolkit 1.8 Plugin Package·Workflow·Runtime
+Profile임</li>
+<li>Qdrant RAG Search·Asset Indexing임</li>
+<li>NeMo Retriever 26.5 선택 Adapter·파일 인제스트 API임</li>
+<li>NVIDIA Embedding NIM Adapter임</li>
+<li>Gemma OpenAI-Compatible vLLM Client임</li>
+<li>Ray Head·Worker·vLLM 실행 Script임</li>
+<li>GPT Image Generate·Edit Client임</li>
+<li>Hunyuan3D Local API Client임</li>
+<li>NeMo ASR Local Adapter임</li>
+<li>NVIDIA Speech NIM HTTP Adapter임</li>
+<li>Faster-Whisper Adapter임</li>
+<li>NeMo Offline Diarization·RTTM Speaker Mapping임</li>
+<li>Meeting Requirement JSON·Revision Patch임</li>
+<li>GLB·STL·PNG·USDA·USDC 출력임</li>
+<li>OpenUSD Root·Geometry·Looks·Meeting·Revision Layer임</li>
+<li>Omniverse Kit Extension·Asset Validator·Nucleus·WebRTC Client
+골격임</li>
+<li>Isaac Sim·Cosmos·DeepStream·TAO·Metropolis 확장 경계임</li>
+<li>Path Traversal·절대경로 노출·내부 파일 정적 접근 차단임</li>
+</ul>
+<h2
+id="구성adapter만-제공하며-실제-runtime-검증이-필요한-항목">구성·Adapter만
+제공하며 실제 Runtime 검증이 필요한 항목</h2>
+<ul>
+<li>사용자 보유 Gemma 64B Checkpoint임</li>
+<li>실제 vLLM Ray Multi-node NCCL임</li>
+<li>TensorRT-LLM Engine Build임</li>
+<li>Triton Model Repository 실배포임</li>
+<li>NVIDIA NIM Container임</li>
+<li>NeMo Retriever GPU/NIM Extraction임</li>
+<li>NeMo ASR 실제 한국어 Model임</li>
+<li>Hunyuan3D Model Weight·GPU 추론임</li>
+<li>Omniverse Kit Runtime·Nucleus·WebRTC임</li>
+<li>Isaac Sim·Cosmos·DeepStream 실환경임</li>
+</ul>
+<h2 id="제공하지-않는-기능">제공하지 않는 기능</h2>
+<ul>
+<li>STEP·B-Rep·CAD Feature Tree임</li>
+<li>GD&amp;T·공차 누적·자동 제조 승인임</li>
+<li>모델 Weight·API Key임</li>
+<li>Enterprise SSO·결제·Credit임</li>
+</ul>
+</body>
+</html>

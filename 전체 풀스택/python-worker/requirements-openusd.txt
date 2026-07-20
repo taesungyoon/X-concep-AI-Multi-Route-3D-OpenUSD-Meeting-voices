@@ -1,0 +1,2 @@
+# OpenUSD parser and binary USDC export (already included in requirements.txt)
+usd-core>=24.11

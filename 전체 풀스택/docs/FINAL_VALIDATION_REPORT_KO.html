@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>X concep AI NVIDIA ������ ������ ���������</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="final-doc.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">X concep AI NVIDIA ������ ������ ���������</h1>
+</header>
+<h1 id="x-concep-ai-nvidia-기술스택-최종-검증-보고서">X concep AI NVIDIA
+기술스택 최종 검증 보고서</h1>
+<p>검증 기준일: 2026-07-18</p>
+<h2 id="검증-대상">1. 검증 대상</h2>
+<ul>
+<li>XconcepAI NVIDIA 기술스택 고도화전략 2026-07-02 자료 11쪽임</li>
+<li>X concep AI 소개서 2026-07-02 자료 23쪽임</li>
+<li>기존 회의·Omniverse 풀스택 전달본임</li>
+<li>사용자 제시 목표 아키텍처임</li>
+</ul>
+<h2 id="자료-기반-핵심-확인">2. 자료 기반 핵심 확인</h2>
+<h3 id="기술스택-전략-자료">기술스택 전략 자료</h3>
+<p>자료는 기존 PHP·DRF·MySQL을 전면 교체하지 않고 NeMo Agent Toolkit,
+NIM, Qdrant, OpenUSD·Omniverse를 단계적으로 추가하는 방향을 제시함. 3D는
+기존 GLB Viewer를 유지하면서 USD 후처리와 Omniverse 검수로 병행하고,
+Isaac Sim과 Cosmos는 장기 과제에 배치함.</p>
+<h3 id="서비스-소개서">서비스 소개서</h3>
+<p>소개서는 X concep AI를 요구사항에서 2D·3D·Proposal·Six-View로
+연결되는 Pre-CAD Workflow Agent로 정의함. 소개서의 현재 출력 설명에는
+STL이 Mesh 기반이며 Parametric CAD·제조 Feature는 향후 확장이라고
+명시함. 고객 미팅 현장에서 요구사항을 즉시 시각화·3D화하는 영업 사용
+사례도 제시함.</p>
+<h2 id="기존-제작본-판정">3. 기존 제작본 판정</h2>
+<h3 id="일치한-부분">일치한 부분</h3>
+<ul>
+<li>PHP 반응형 UI임</li>
+<li>Gemma 계열 LLM용 vLLM·Ray Adapter임</li>
+<li>GPT Image API 외부 호출 분리임</li>
+<li>Hunyuan3D 로컬 3D 생성임</li>
+<li>회의 음성 Chunk 전사와 요구사항 분석임</li>
+<li>GLB·STL·PNG·OpenUSD 출력임</li>
+<li>Omniverse Kit·Nucleus·WebRTC 확장 골격임</li>
+</ul>
+<h3 id="불일치했던-부분">불일치했던 부분</h3>
+<ul>
+<li>DRF·MySQL 제어 계층이 없었음</li>
+<li>Qdrant 설계 메모리와 RAG가 없었음</li>
+<li>NeMo Agent Toolkit 실제 Plugin·Runtime Profile이 없었음</li>
+<li>NeMo Retriever 파일 추출 경계가 없었음</li>
+<li>NIM·TensorRT-LLM·Triton의 역할 구분이 불명확했음</li>
+<li>Cosmos가 실제 3D Simulation Engine처럼 표현될 위험이 있었음</li>
+<li>현재 Mesh 출력이 제조 상세 CAD로 과대 표현될 위험이 있었음</li>
+</ul>
+<h2 id="수정-완료-항목">4. 수정 완료 항목</h2>
+<ol type="1">
+<li>DRF Control Plane과 MySQL Model을 추가함</li>
+<li>Project·Asset·GenerationJob·MeetingSession·TranscriptSegment를
+관계형 DB로 관리함</li>
+<li>Redis·Celery 비동기 Profile을 추가함</li>
+<li>Qdrant Knowledge Service와 Asset Indexing·RAG Search를 추가함</li>
+<li>NeMo Retriever 26.5 선택 설치 Profile과 Custom Qdrant 저장 Adapter를
+추가함</li>
+<li>NeMo Agent Toolkit 1.8 Plugin Package, YAML Workflow, 선택 Runtime
+Profile을 추가함</li>
+<li>Gemma 커스텀 체크포인트의 기본 Serving은 vLLM·Ray로 유지함</li>
+<li>TensorRT-LLM·Triton·NIM을 단계별 Serving 구조로 재정의함</li>
+<li>NeMo ASR Local·Speech NIM·Faster-Whisper 경로를 유지함</li>
+<li>NeMo ClusteringDiarizer 선택 Profile과 RTTM Speaker Mapping을
+추가함</li>
+<li>회의 Transcript에 Qdrant 검색 문맥을 결합해 Gemma가
+확정·변경·미확정·안전 요구를 구조화함</li>
+<li>Hunyuan3D 결과를 GLB·STL·OpenUSD Layer Package로 변환함</li>
+<li>OpenUSD에 Meeting Metadata·Revision·PhysicsScene·Variant 준비 구조를
+유지함</li>
+<li>Isaac Sim·Cosmos·DeepStream·TAO·Metropolis를 선택 확장으로
+분리함</li>
+<li>서버 절대경로, 내부 JSON, 원본 음성 노출을 차단함</li>
+</ol>
+<h2 id="최종-판정">5. 최종 판정</h2>
+<h3 id="poc사내개발고객시연">PoC·사내개발·고객시연</h3>
+<p>승인 가능함.</p>
+<h3 id="실제-gpu-통합-테스트">실제 GPU 통합 테스트</h3>
+<p>조건부 승인임. 실제 Gemma 체크포인트, GPT Image Key, Hunyuan3D
+가중치, NeMo Speech·Retriever, NVIDIA Kit Runtime이 필요함.</p>
+<h3 id="인터넷-공개-운영">인터넷 공개 운영</h3>
+<p>현재 상태로는 승인 불가함. 사용자 인증, Tenant 분리, 비동기 GPU
+Queue, 사용량 제한, 회의 동의·파기 정책, 비밀정보 관리가 추가되어야
+함.</p>
+<h2 id="의도적-제외">6. 의도적 제외</h2>
+<ul>
+<li>모델 가중치와 API Key 재배포임</li>
+<li>STEP·B-Rep·GD&amp;T·공차 검증임</li>
+<li>실제 Nucleus 계정과 Live Session임</li>
+<li>실제 Isaac Sim Robot Joint 자동 구성임</li>
+<li>Cosmos 모델 Serving임</li>
+<li>DeepStream 실카메라 RTSP 테스트임</li>
+<li>결제·Credit·Enterprise SSO임</li>
+</ul>
+<h2 id="최종-전달-시점-제한사항">7. 최종 전달 시점 제한사항</h2>
+<ul>
+<li>Omniverse Web Client의 실제 npm 의존성 설치·Production Bundle은
+NVIDIA 패키지 접근 가능한 환경에서 재검증해야 함</li>
+<li>Docker Engine 기반 전체 Container Build는 배포 서버에서 재검증해야
+함</li>
+<li>실제 모델·GPU Runtime 검증 전에는 Mock 통합 성공을 실서비스 성능
+승인으로 해석하지 않음</li>
+</ul>
+</body>
+</html>

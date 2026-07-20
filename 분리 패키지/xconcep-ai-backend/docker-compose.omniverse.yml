@@ -1,0 +1,17 @@
+# Optional Kit streaming service. NVIDIA Kit SDK image must be supplied by the operator.
+services:
+  omniverse-kit:
+    image: ${OMNIVERSE_KIT_IMAGE:?Set OMNIVERSE_KIT_IMAGE to a packaged Kit App image}
+    runtime: nvidia
+    environment:
+      ACCEPT_EULA: Y
+      XCONCEP_STORAGE_ROOT: /workspace/storage
+      XCONCEP_NUCLEUS_URL: ${OMNIVERSE_NUCLEUS_URL:-}
+    volumes:
+      - ./storage:/workspace/storage
+      - ./omniverse-kit:/workspace/xconcep-omniverse:ro
+    ports:
+      - "49100:49100/tcp"
+      - "47998:47998/udp"
+      - "47999:47999/udp"
+    restart: unless-stopped

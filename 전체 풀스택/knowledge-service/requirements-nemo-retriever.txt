@@ -1,0 +1,3 @@
+# NVIDIA NeMo Retriever Library 26.5 requires Python 3.12.
+# Install only in the knowledge service image when document extraction is required.
+nemo-retriever[local,multimedia]==26.5.0

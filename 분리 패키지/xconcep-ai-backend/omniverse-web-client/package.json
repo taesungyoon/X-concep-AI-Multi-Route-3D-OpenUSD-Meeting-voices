@@ -1,0 +1,23 @@
+{
+  "name": "xconcep-omniverse-web-client",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@nvidia/ov-web-rtc": "6.4.4"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3",
+    "vite": "7.0.0"
+  }
+}

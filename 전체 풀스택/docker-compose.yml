@@ -1,0 +1,205 @@
+services:
+  web:
+    build: ./frontend-php
+    ports: ["${WEB_PORT:-8080}:80"]
+    environment:
+      CONTROL_PLANE_URL: http://control-plane:8000
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-30}
+    volumes:
+      - ./storage:/var/www/html/storage
+    depends_on:
+      control-plane: {condition: service_healthy}
+    restart: unless-stopped
+
+  control-plane:
+    build: ./control-plane-drf
+    environment: &control_env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DB_ENGINE: ${DB_ENGINE:-mysql}
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-xconcep}
+      MYSQL_USER: ${MYSQL_USER:-xconcep}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-xconcep}
+      STORAGE_PATH: /app/storage
+      AGENT_GATEWAY_URL: http://agent-layer:8010
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:8020
+      QDRANT_URL: http://qdrant:6333
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SYNC_PIPELINE: ${SYNC_PIPELINE:-true}
+    volumes: ["./storage:/app/storage"]
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      agent-layer: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  celery-worker:
+    build: ./control-plane-drf
+    command: celery -A config.celery app worker -l INFO
+    environment: *control_env
+    volumes: ["./storage:/app/storage"]
+    depends_on: [control-plane, redis]
+    profiles: ["async"]
+
+  agent-layer:
+    build:
+      context: ./agent-layer-nat
+      args:
+        INSTALL_NAT: "${INSTALL_NAT:-false}"
+    environment:
+      AGENT_RUNTIME: ${AGENT_RUNTIME:-fallback}
+      PYTHON_WORKER_URL: http://python-worker:8001
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:8020
+      NAT_SERVER_URL: http://nat-runtime:8011
+    depends_on:
+      python-worker: {condition: service_healthy}
+      knowledge-service: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  nat-runtime:
+    build:
+      context: ./agent-layer-nat
+      args:
+        INSTALL_NAT: "true"
+    command: ["nat","serve","--config_file=configs/xconcep_workflow.yml","--host","0.0.0.0","--port","8011"]
+    environment:
+      PYTHON_WORKER_URL: http://python-worker:8001
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
+      VLLM_API_KEY: ${VLLM_API_KEY:-local-not-required}
+      GEMMA_MODEL_NAME: ${GEMMA_MODEL_NAME:-gemma-4-64b-local}
+    depends_on:
+      python-worker: {condition: service_healthy}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    profiles: ["nat"]
+    restart: unless-stopped
+
+  python-worker:
+    build:
+      context: ./python-worker
+      args:
+        INSTALL_SPEECH: ${INSTALL_SPEECH:-false}
+        INSTALL_NEMO_SPEECH: ${INSTALL_NEMO_SPEECH:-false}
+        INSTALL_OPENSCAD: ${INSTALL_OPENSCAD:-false}
+        INSTALL_BLENDER: ${INSTALL_BLENDER:-false}
+    environment:
+      STORAGE_PATH: /app/storage
+      PUBLIC_STORAGE_PREFIX: /storage
+      PIPELINE_MODE: ${PIPELINE_MODE:-mock}
+      LLM_MODE: ${LLM_MODE:-mock}
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
+      VLLM_API_KEY: ${VLLM_API_KEY:-local-not-required}
+      GEMMA_MODEL_NAME: ${GEMMA_MODEL_NAME:-gemma-4-64b-local}
+      OPENAI_IMAGE_MODE: ${OPENAI_IMAGE_MODE:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-2}
+      HUNYUAN_MODE: ${HUNYUAN_MODE:-mock}
+      HUNYUAN_API_URL: ${HUNYUAN_API_URL:-http://host.docker.internal:8081}
+      OPENSCAD_MODE: ${OPENSCAD_MODE:-auto}
+      OPENSCAD_BIN: ${OPENSCAD_BIN:-openscad}
+      OPENSCAD_TIMEOUT_SECONDS: ${OPENSCAD_TIMEOUT_SECONDS:-600}
+      BLENDER_MODE: ${BLENDER_MODE:-auto}
+      BLENDER_BIN: ${BLENDER_BIN:-blender}
+      BLENDER_TIMEOUT_SECONDS: ${BLENDER_TIMEOUT_SECONDS:-1800}
+      ROUTING_LOW_CONFIDENCE: ${ROUTING_LOW_CONFIDENCE:-0.60}
+      ROUTING_HIGH_CONFIDENCE: ${ROUTING_HIGH_CONFIDENCE:-0.80}
+      VALIDATION_DIMENSION_TOLERANCE_PCT: ${VALIDATION_DIMENSION_TOLERANCE_PCT:-5.0}
+      ENABLE_PARALLEL_PREVIEW: ${ENABLE_PARALLEL_PREVIEW:-true}
+      SPEECH_MODE: ${SPEECH_MODE:-mock}
+      NEMO_ASR_MODEL: ${NEMO_ASR_MODEL:-nvidia/parakeet-tdt-0.6b-v3}
+      NEMO_DIARIZER_CONFIG: ${NEMO_DIARIZER_CONFIG:-}
+      DIARIZATION_MODE: ${DIARIZATION_MODE:-none}
+      WHISPER_MODEL: ${WHISPER_MODEL:-large-v3-turbo}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cuda}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-float16}
+      NVIDIA_ASR_URL: ${NVIDIA_ASR_URL:-http://host.docker.internal:9000}
+      OPENUSD_GENERATE_USDC: ${OPENUSD_GENERATE_USDC:-true}
+      OMNIVERSE_ENABLED: ${OMNIVERSE_ENABLED:-true}
+      OMNIVERSE_GENERATE_LAYERS: ${OMNIVERSE_GENERATE_LAYERS:-true}
+      OMNIVERSE_ENABLE_PHYSICS: ${OMNIVERSE_ENABLE_PHYSICS:-true}
+      OMNIVERSE_ENABLE_VARIANTS: ${OMNIVERSE_ENABLE_VARIANTS:-true}
+      OMNIVERSE_NUCLEUS_URL: ${OMNIVERSE_NUCLEUS_URL:-}
+      OMNIVERSE_STREAM_URL: ${OMNIVERSE_STREAM_URL:-}
+    volumes: ["./storage:/app/storage"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  knowledge-service:
+    build:
+      context: ./knowledge-service
+      args:
+        INSTALL_NEMO_RETRIEVER: ${INSTALL_NEMO_RETRIEVER:-false}
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-xconcep_memory}
+      EMBED_MODE: ${EMBED_MODE:-hash}
+      EMBED_URL: ${EMBED_URL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-nvidia/nv-embedqa-e5-v5}
+      EMBED_DIM: ${EMBED_DIM:-384}
+      NEMO_RETRIEVER_MODE: ${NEMO_RETRIEVER_MODE:-fallback}
+    depends_on:
+      qdrant: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-xconcep}
+      MYSQL_USER: ${MYSQL_USER:-xconcep}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-xconcep}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root-change-me}
+    command: ["--character-set-server=utf8mb4","--collation-server=utf8mb4_unicode_ci"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD-SHELL","mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.2
+    volumes: ["qdrant-data:/qdrant/storage"]
+    healthcheck:
+      test: ["CMD-SHELL","bash -c '</dev/tcp/127.0.0.1/6333'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.2-alpine
+    command: redis-server --appendonly yes
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  qdrant-data:
+  redis-data:

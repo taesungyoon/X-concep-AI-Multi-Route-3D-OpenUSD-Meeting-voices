@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>X concep AI ������ ������ ���������</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">X concep AI ������ ������ ���������</h1>
+</header>
+<h1 id="x-concep-ai-회의omniverse-풀스택-최종-점검-보고서">X concep AI
+회의·Omniverse 풀스택 최종 점검 보고서</h1>
+<h2 id="판정">1. 판정</h2>
+<p><strong>조건부 승인</strong>임.</p>
+<p>Mock 기반 PHP→Python→회의 전사→Gemma 분석→GPT Image Mock→Hunyuan3D
+Mock→GLB/STL/PNG→OpenUSD 전체 연동은 정상임. 실제 상용 운영 승인은
+실모델·GPU 클러스터·NVIDIA Runtime 검증과 인증·비동기 Queue 적용 후
+가능함.</p>
+<h2 id="점검-범위">2. 점검 범위</h2>
+<ul>
+<li>PHP 반응형 UI·API Gateway임.</li>
+<li>회의 음성 Chunk 업로드와 준실시간 전사 흐름임.</li>
+<li>Gemma 계열 커스텀 64B의 vLLM OpenAI 호환 Client임.</li>
+<li>Ray 멀티노드 실행 스크립트임.</li>
+<li>GPT Image API Client임.</li>
+<li>Hunyuan3D 로컬 API Client임.</li>
+<li>GLB·STL·PNG 생성 및 다운로드임.</li>
+<li>OpenUSD USDA·USDC·Layer Package임.</li>
+<li>Omniverse Kit Extension·Asset Validator·Nucleus·WebRTC
+Client임.</li>
+<li>경로 보안·민감 파일 공개·XSS·산출물 무결성임.</li>
+</ul>
+<h2 id="수정-완료-항목">3. 수정 완료 항목</h2>
+<h3 id="openusd">OpenUSD</h3>
+<ul>
+<li>잘못 작성된 VariantSet USDA 문법을 수정함.</li>
+<li>문자열 검색식 검증을 실제 <code>Usd.Stage.Open()</code> Parser
+검증으로 교체함.</li>
+<li><code>usd-core</code>를 기본 의존성에 포함하여 USDC 생성을
+보장함.</li>
+<li>root.usda·model.usda·model.usdc를 모두 재개방하여 13개 Prim을
+확인함.</li>
+</ul>
+<h3 id="경로정보보호">경로·정보보호</h3>
+<ul>
+<li>Python Worker의 입력 경로를 <code>STORAGE_PATH</code> 내부로
+제한함.</li>
+<li><code>..</code> 및 절대경로를 이용한 Path Traversal을 차단함.</li>
+<li>Hunyuan3D가 반환한 로컬 파일 경로도 Storage Root 내부인지
+검증함.</li>
+<li><code>project.json</code>, <code>analysis.json</code>, 원본 업로드,
+회의 음성을 PHP 정적 경로에서 HTTP 403 처리함.</li>
+<li>LLM·생성 결과 문자열을 HTML에 출력할 때 Escape 처리함.</li>
+<li>3D Asset URL은 생성 결과 경로만 허용함.</li>
+</ul>
+<h3 id="회의-음성">회의 음성</h3>
+<ul>
+<li>NVIDIA Speech NIM REST Endpoint를
+<code>/v1/audio/transcriptions</code>로 수정함.</li>
+<li>multipart 필드명을 <code>file</code>로 수정함.</li>
+<li>WebM·M4A·OGG 입력을 FFmpeg로 16kHz Mono WAV로 변환함.</li>
+<li>근거 없는 교대 방식 화자 분리를 제거함.</li>
+<li>HTTP REST 전사는 준실시간 Chunk 처리로 표시하고, 지속 Streaming·화자
+분리는 별도 WebSocket/gRPC 경로로 구분함.</li>
+</ul>
+<h3 id="hunyuan3d">Hunyuan3D</h3>
+<ul>
+<li>요청에 <code>type=glb</code>와 <code>remove_background=true</code>를
+명시함.</li>
+<li>GLB Binary·JSON Base64·URL·공유 파일 응답 경로를 분리함.</li>
+</ul>
+<h3 id="nvidia-omniverse">NVIDIA Omniverse</h3>
+<ul>
+<li>Asset Validator의 <code>ValidationEngine.validate()</code> 결과를
+단일 <code>Results</code> 객체로 처리함.</li>
+<li>Kit Extension의 Variant 선택 UI를 단순 버튼 방식으로 안정화함.</li>
+<li>WebRTC Client를 <code>@nvidia/ov-web-rtc</code> 6.4.4의 정적
+<code>AppStreamer.connect()</code> 구조로 수정함.</li>
+<li>Nucleus 게시 스크립트는 <code>omni.client.copy_file()</code>과
+덮어쓰기 동작을 사용함.</li>
+</ul>
+<h2 id="최종-테스트-결과">4. 최종 테스트 결과</h2>
+<ul>
+<li>Python pytest 7개 모두 통과함.</li>
+<li>Python 및 Omniverse Kit Python 정적 Compile을 통과함.</li>
+<li>PHP 6개 파일 문법 검사를 통과함.</li>
+<li>JavaScript 2개 파일 문법 검사를 통과함.</li>
+<li>Docker Compose 기본·Omniverse Overlay YAML Parsing을 통과함.</li>
+<li>실제 PHP·Uvicorn Mock 서버를 기동하여 End-to-End API를 통과함.</li>
+<li>GLB 6,384 bytes, STL 6,084 bytes, PNG Preview, USDA, USDC를 생성하고
+HTTP 다운로드를 확인함.</li>
+<li>root.usda·model.usda·model.usdc를 OpenUSD Parser로 재개방함.</li>
+<li>프로젝트 내부 JSON과 회의 원본 음성에 대한 HTTP 403을 확인함.</li>
+</ul>
+<p>상세 표는 <code>docs/TEST_REPORT.md</code>에 기록함.</p>
+<h2 id="운영-배포-전-차단-조건">5. 운영 배포 전 차단 조건</h2>
+<ol type="1">
+<li>인증·권한·Tenant 분리가 없음. 외부 공개 전 반드시 적용해야 함.</li>
+<li>PHP가 AI 요청을 동기 호출함. 장시간 생성과 동시접속을 위해 Queue가
+필요함.</li>
+<li>사용자 지정 Gemma 64B는 공식 모델명이 아닌 커스텀 체크포인트임. 실제
+아키텍처·Tokenizer·Chat Template·멀티모달 지원 검증이 필요함.</li>
+<li>실 GPT Image API, Hunyuan3D, vLLM·Ray, Speech NIM을 현재 환경에서
+호출하지 못함.</li>
+<li>NVIDIA Kit/Nucleus/WebRTC Runtime을 현재 환경에서 기동하지
+못함.</li>
+<li>회의 음성·전사 데이터의 동의·보존·삭제 정책이 필요함.</li>
+<li>Hunyuan3D 단일 Mesh는 모터·프레임·센서의 의미 기반 Assembly 구조를
+자동 복원하지 않음.</li>
+<li>OpenUSD는 STEP·B-Rep 제조 CAD를 대체하지 않음.</li>
+</ol>
+<h2 id="차선-시나리오">6. 차선 시나리오</h2>
+<p>1차 운영은 GLB Three.js Viewer와 OpenUSD 다운로드까지만 배포함.
+Omniverse WebRTC·Nucleus·Live Session은 Enterprise On-Premise 환경 검증
+후 활성화함. 실시간 화자 분리는 제외하고 15초 Chunk 전사와 사용자 수동
+보정을 유지함.</p>
+<h2 id="최종-결론">7. 최종 결론</h2>
+<p>현재 전달본은 <strong>PoC·사내 검증·GPU 서비스 연동 개발의 기준
+코드로 사용 가능함</strong>. 인증·Queue·실 GPU·NVIDIA Runtime 검증 없이
+인터넷에 직접 공개하는 것은 승인하지 않음.</p>
+</body>
+</html>

@@ -1,0 +1,33 @@
+[package]
+title = "X concep AI Meeting Review"
+description = "OpenUSD meeting-driven 3D review, PhysX validation and WebRTC streaming application"
+version = "1.0.0"
+keywords = ["OpenUSD", "meeting", "manufacturing", "streaming", "PhysX"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.kit.window.file" = {}
+"omni.kit.viewport.window" = {}
+"omni.kit.viewport.utility" = {}
+"omni.usd" = {}
+"omni.physx" = {}
+"omni.kit.asset_converter" = {}
+"omni.asset_validator.core" = {}
+"omni.client.lib" = {}
+"omni.kit.livestream.app" = {}
+"omni.kit.livestream.messaging" = {}
+"xconcep.meeting.review" = {}
+
+[settings]
+app.name = "X concep Meeting Review"
+app.window.title = "X concep AI · Omniverse Meeting Review"
+app.viewport.defaults.fillViewport = true
+renderer.active = "rtx"
+renderer.enabled = "rtx"
+rtx.rendermode = "RaytracedLighting"
+exts."omni.kit.livestream.app".primaryStream.streamType = "webrtc"
+exts."xconcep.meeting.review".manifestPath = ""
+exts."xconcep.meeting.review".autoReload = true
+
+[settings.app.exts]
+folders.'++' = ["${app}/../source/extensions"]

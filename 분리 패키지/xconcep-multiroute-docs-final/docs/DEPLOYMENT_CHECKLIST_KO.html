@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>DEPLOYMENT_CHECKLIST_KO</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="final-doc.css" />
+</head>
+<body>
+<h1 id="운영-배포-체크리스트">운영 배포 체크리스트</h1>
+<h2 id="보안">보안</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />HTTPS·HSTS 적용함</label></li>
+<li><label><input type="checkbox" />SSO 또는 계정 인증
+적용함</label></li>
+<li><label><input type="checkbox" />Company Tenant Query Filter
+적용함</label></li>
+<li><label><input type="checkbox" />Download Signed URL
+적용함</label></li>
+<li><label><input type="checkbox" />OpenAI Key Secret Manager
+저장함</label></li>
+<li><label><input type="checkbox" />내부 GPU·DB Port 비공개
+적용함</label></li>
+<li><label><input type="checkbox" />회의 녹음 동의 UI
+적용함</label></li>
+<li><label><input type="checkbox" />회의 음성·Transcript 보존·파기 정책
+적용함</label></li>
+</ul>
+<h2 id="데이터">데이터</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />MySQL Backup·복구 Drill
+수행함</label></li>
+<li><label><input type="checkbox" />Qdrant Snapshot 수행함</label></li>
+<li><label><input type="checkbox" />Storage Virus·MIME Scan
+적용함</label></li>
+<li><label><input type="checkbox" />고객 Prompt 외부 전송 범위
+승인함</label></li>
+</ul>
+<h2 id="gpu">GPU</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />vLLM TP·PP와 Ray Resource
+일치함</label></li>
+<li><label><input type="checkbox" />LLM TTFT·TPS·OOM 검증함</label></li>
+<li><label><input type="checkbox" />Hunyuan3D VRAM·Queue
+검증함</label></li>
+<li><label><input type="checkbox" />Speech ASR 실회의 WER
+평가함</label></li>
+<li><label><input type="checkbox" />GPU Job Queue·Timeout·Retry
+적용함</label></li>
+</ul>
+<h2 id="nvidia-runtime">NVIDIA Runtime</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />NAT Plugin
+설치·<code>nat validate</code> 수행함</label></li>
+<li><label><input type="checkbox" />NeMo Retriever 추출 정확도
+평가함</label></li>
+<li><label><input type="checkbox" />Embedding NIM Dimension과 Qdrant
+Collection 일치함</label></li>
+<li><label><input type="checkbox" />OpenUSD Asset Validator
+통과함</label></li>
+<li><label><input type="checkbox" />Nucleus ACL·TLS 확인함</label></li>
+<li><label><input type="checkbox" />WebRTC TURN/STUN 확인함</label></li>
+<li><label><input type="checkbox" />Isaac Sim 대상 Asset만 별도 SimReady
+처리함</label></li>
+</ul>
+<h2 id="제품-문구">제품 문구</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />Mesh 기반 Pre-CAD 결과로
+표시함</label></li>
+<li><label><input type="checkbox" />STEP·정밀 제조 CAD 자동 생성으로
+과대 표현하지 않음</label></li>
+<li><label><input type="checkbox" />AI 추정 치수와 사용자 확정 치수를
+구분함</label></li>
+</ul>
+</body>
+</html>

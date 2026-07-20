@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>X concep AI ��������Omniverse �������������� ���������</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">X concep AI ��������Omniverse ��������������
+���������</h1>
+</header>
+<h1 id="x-concep-ai-회의omniverse-최종-설치-및-운영-매뉴얼">X concep AI
+회의·Omniverse 최종 설치 및 운영 매뉴얼</h1>
+<h2 id="제공-기능">1. 제공 기능</h2>
+<ul>
+<li>프롬프트·참고 이미지 입력함</li>
+<li>회의 음성 녹음·Chunk 업로드·전사함</li>
+<li>Gemma가 제조 요구사항을 구조화함</li>
+<li>GPT Image API로 2D 설계안 4개를 생성함</li>
+<li>사용자가 2D 결과를 비교·선택함</li>
+<li>Hunyuan3D 로컬에서 GLB·STL을 생성함</li>
+<li>OpenUSD Layer Package와 선택적 USDC를 생성함</li>
+<li>Omniverse Kit에서 RTX·PhysX·Validator·Nucleus·WebRTC 검토 경로를
+제공함</li>
+</ul>
+<h2 id="기본-요구사항">2. 기본 요구사항</h2>
+<h3 id="weborchestrator">Web·Orchestrator</h3>
+<ul>
+<li>Docker Engine 또는 PHP 8.2+와 Python 3.11+ 필요함</li>
+<li>파일 저장공간 필요함</li>
+<li>HTTPS 적용을 권장함</li>
+</ul>
+<h3 id="gemma-vllmray">Gemma vLLM·Ray</h3>
+<ul>
+<li>사용자 보유 Gemma 계열 64B 체크포인트 필요함</li>
+<li>vLLM이 해당 아키텍처·Tokenizer·멀티모달 입력을 지원하는지 별도
+확인해야 함</li>
+<li>GPU 수에 맞는 Tensor Parallel·Pipeline Parallel 값을 정해야 함</li>
+</ul>
+<h3 id="hunyuan3d">Hunyuan3D</h3>
+<ul>
+<li>Hunyuan3D 지원 CUDA·PyTorch 환경 필요함</li>
+<li>모델 가중치와 라이선스 확인이 필요함</li>
+</ul>
+<h3 id="omniverse">Omniverse</h3>
+<ul>
+<li>NVIDIA GPU Driver와 Kit SDK 또는 운영자가 패키징한 Kit App Image
+필요함</li>
+<li>Nucleus·Kit App Streaming은 NVIDIA 제품·계정·라이선스 조건을
+확인해야 함</li>
+</ul>
+<h2 id="mock-실행">3. Mock 실행</h2>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">unzip</span> xconcep-meeting-omniverse-fullstack-final-checked.zip</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> xconcep-omniverse-meeting-final-checked</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> .env.example .env</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">--build</span></span></code></pre></div>
+<pre class="text"><code>http://localhost:8080</code></pre>
+<h2 id="실제-ai-연결">4. 실제 AI 연결</h2>
+<pre class="env"><code>PIPELINE_MODE=production
+LLM_MODE=vllm
+VLLM_BASE_URL=http://RAY_HEAD:8000/v1
+VLLM_API_KEY=local-not-required
+GEMMA_MODEL_NAME=gemma-4-64b-local
+
+OPENAI_IMAGE_MODE=openai
+OPENAI_API_KEY=sk-...
+OPENAI_IMAGE_MODEL=gpt-image-2
+
+HUNYUAN_MODE=local_api
+HUNYUAN_API_URL=http://HUNYUAN3D:8081</code></pre>
+<h2 id="회의-음성-연결">5. 회의 음성 연결</h2>
+<h3 id="faster-whisper">faster-whisper</h3>
+<pre class="env"><code>SPEECH_MODE=faster_whisper
+INSTALL_SPEECH=true
+WHISPER_MODEL=large-v3-turbo
+WHISPER_DEVICE=cuda
+WHISPER_COMPUTE_TYPE=float16</code></pre>
+<p>이미지를 다시 빌드함.</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose build <span class="at">--no-cache</span> python-worker</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span></span></code></pre></div>
+<h3 id="nvidia-speech-nim">NVIDIA Speech NIM</h3>
+<pre class="env"><code>SPEECH_MODE=nvidia_nim
+NVIDIA_ASR_URL=http://ASR_NIM:9000
+NVIDIA_ASR_TRANSCRIBE_PATH=/v1/audio/transcriptions
+DIARIZATION_MODE=none</code></pre>
+<p>HTTP REST 전사는 multipart <code>file</code> 필드를 사용함. 지속
+스트리밍과 화자 분리가 필요할 경우 NIM WebSocket 또는 gRPC Streaming
+Client를 별도 적용함.</p>
+<h2 id="사용자-사용법">6. 사용자 사용법</h2>
+<h3 id="직접-입력">직접 입력</h3>
+<ol type="1">
+<li>직접 입력 모드를 선택함</li>
+<li>프롬프트와 참고 이미지를 입력함</li>
+<li>2D 설계안 생성함</li>
+<li>4개 중 하나를 선택함</li>
+<li>3D 생성함</li>
+<li>GLB·STL·PNG·OpenUSD 파일을 다운로드함</li>
+</ol>
+<h3 id="회의-음성">회의 음성</h3>
+<ol type="1">
+<li>회의 음성 분석 모드를 선택함</li>
+<li>녹음 시작함</li>
+<li>Transcript를 확인·수정함</li>
+<li>회의 내용 분석함</li>
+<li>확정·변경·미확정·안전 항목을 검토함</li>
+<li>현재 내용으로 2D 생성함</li>
+<li>2D를 선택하고 3D 생성함</li>
+<li>Omniverse RTX 또는 다운로드 파일로 검토함</li>
+</ol>
+<h2 id="omniverse-적용">7. Omniverse 적용</h2>
+<pre class="env"><code>OMNIVERSE_ENABLED=true
+OMNIVERSE_GENERATE_LAYERS=true
+OMNIVERSE_ENABLE_PHYSICS=true
+OMNIVERSE_ENABLE_VARIANTS=true
+OMNIVERSE_NUCLEUS_URL=omniverse://SERVER/Projects/Xconcep
+OMNIVERSE_STREAM_URL=http://WEBRTC_CLIENT
+OMNIVERSE_KIT_IMAGE=registry/xconcep-kit:1.0</code></pre>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose <span class="at">-f</span> docker-compose.yml <span class="at">-f</span> docker-compose.omniverse.yml up <span class="at">-d</span></span></code></pre></div>
+<h2 id="저장-구조">8. 저장 구조</h2>
+<pre class="text"><code>storage/projects/PRJ-ID/
+├─ project.json
+├─ uploads/
+├─ meeting/
+│  ├─ audio/
+│  ├─ analysis.json
+│  └─ revision-XXX.json
+├─ 2d/
+└─ result/
+   ├─ model.glb
+   ├─ model.stl
+   ├─ render.png
+   ├─ model.usda
+   ├─ model.usdc
+   └─ openusd/</code></pre>
+<h2 id="운영-점검">9. 운영 점검</h2>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> http://localhost:8080/health</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> http://localhost:8080/api/system-status</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> http://localhost:8001/health</span></code></pre></div>
+<p>확인 항목임.</p>
+<ul>
+<li>PHP와 Python Health가 정상임</li>
+<li>vLLM Model Name이 일치함</li>
+<li>OpenAI Key가 Web 응답·Log에 노출되지 않음</li>
+<li>Hunyuan3D 응답이 GLB임</li>
+<li>Speech Chunk가 처리됨</li>
+<li>USD Default Prim·Layer 경로가 유효함</li>
+<li>Nucleus 권한과 WebRTC ICE 연결이 정상임</li>
+</ul>
+<h2 id="장애-대응">10. 장애 대응</h2>
+<h3 id="마이크가-동작하지-않음">마이크가 동작하지 않음</h3>
+<ul>
+<li>HTTPS 또는 localhost에서 실행해야 함</li>
+<li>브라우저 마이크 권한 확인함</li>
+<li>WebM Codec 지원 확인함</li>
+<li>PHP 업로드 한도 확인함</li>
+</ul>
+<h3 id="전사가-느림">전사가 느림</h3>
+<ul>
+<li>Whisper Model 크기를 줄임</li>
+<li>Chunk 길이를 조정함</li>
+<li>GPU Device와 Compute Type 확인함</li>
+<li>Speech NIM Streaming으로 전환 검토함</li>
+</ul>
+<h3 id="gemma-json-오류">Gemma JSON 오류</h3>
+<ul>
+<li>Temperature 0.1 이하 유지함</li>
+<li><code>response_format=json_object</code> 지원 여부 확인함</li>
+<li>Model Server Log에서 Token Truncation 확인함</li>
+</ul>
+<h3 id="d-생성-실패">3D 생성 실패</h3>
+<ul>
+<li>Hunyuan3D URL과 Timeout 확인함</li>
+<li>선택한 2D 이미지 파일 경로 확인함</li>
+<li>VRAM·CUDA OOM 확인함</li>
+</ul>
+<h3 id="openusd가-omniverse에서-열리지-않음">OpenUSD가 Omniverse에서
+열리지 않음</h3>
+<ul>
+<li>Root Sublayer 상대경로 확인함</li>
+<li>Texture·Mesh Asset 경로 확인함</li>
+<li>Kit와 OpenUSD ABI 호환성 확인함</li>
+<li>Asset Validator 실행함</li>
+</ul>
+</body>
+</html>

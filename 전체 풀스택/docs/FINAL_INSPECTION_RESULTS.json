@@ -1,0 +1,37 @@
+{
+  "release": "xconcep-meeting-omniverse-fullstack-final-checked",
+  "verdict": "conditional_approval",
+  "mock_e2e": "pass",
+  "tests": {
+    "pytest_passed": 7,
+    "php_files_linted": 6,
+    "javascript_files_checked": 2,
+    "compose_files_parsed": 2,
+    "openusd_stages_parsed": [
+      "root.usda",
+      "model.usda",
+      "model.usdc"
+    ],
+    "openusd_prim_count_each": 13,
+    "sensitive_http_access": "403"
+  },
+  "not_verified": [
+    "real_custom_gemma_64b",
+    "vllm_ray_multinode",
+    "openai_image_api",
+    "hunyuan3d_gpu",
+    "nvidia_speech_nim",
+    "omniverse_kit_runtime",
+    "nucleus_live",
+    "webrtc_runtime",
+    "docker_image_build"
+  ],
+  "required_before_production": [
+    "authentication_and_tenant_isolation",
+    "async_job_queue",
+    "secret_management",
+    "data_retention_policy",
+    "rate_limits",
+    "real_gpu_integration_test"
+  ]
+}
