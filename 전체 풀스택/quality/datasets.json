@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "default_seed": 20260721,
+  "policy": {
+    "allowed_schemes": ["https"],
+    "allowed_hosts": ["huggingface.co", "raw.githubusercontent.com", "www.nist.gov"],
+    "large_downloads_are_opt_in": true,
+    "license_review_blocks_automatic_download": true
+  },
+  "datasets": [
+    {
+      "id": "parti-prompts",
+      "name": "PartiPrompts",
+      "phases": [2, 3],
+      "purpose": "text-to-image prompt coverage and challenge stratification",
+      "official_url": "https://huggingface.co/datasets/nateraw/parti-prompts",
+      "revision": "944b156abfdad7627c3221b5ec4f6a6fb060a197",
+      "license": "Apache-2.0",
+      "attribution": "Google Parti authors; Hugging Face dataset packaging by nateraw",
+      "auto_download": true,
+      "license_review_required": false,
+      "expected_rows": 1632,
+      "sample_sizes": {"smoke": 64, "standard": 256, "full": 1632},
+      "record_format": "tsv",
+      "artifacts": [
+        {
+          "dest": "PartiPrompts.tsv",
+          "url": "https://huggingface.co/datasets/nateraw/parti-prompts/resolve/944b156abfdad7627c3221b5ec4f6a6fb060a197/PartiPrompts.tsv"
+        }
+      ]
+    },
+    {
+      "id": "geneval",
+      "name": "GenEval prompt metadata",
+      "phases": [2, 3],
+      "purpose": "object count, color, position, and composition alignment evaluation",
+      "official_url": "https://github.com/djghosh13/geneval",
+      "revision": "af4902f24d3ca90ebbb446dd9891a59e0f82725f",
+      "license": "MIT",
+      "attribution": "Ghosh et al., GenEval",
+      "auto_download": true,
+      "license_review_required": false,
+      "expected_rows": 553,
+      "sample_sizes": {"smoke": 64, "standard": 256, "full": 553},
+      "record_format": "jsonl",
+      "artifacts": [
+        {
+          "dest": "evaluation_metadata.jsonl",
+          "url": "https://raw.githubusercontent.com/djghosh13/geneval/af4902f24d3ca90ebbb446dd9891a59e0f82725f/prompts/evaluation_metadata.jsonl"
+        }
+      ]
+    },
+    {
+      "id": "usd-wg-primvar",
+      "name": "ASWF USD Working Group Primvar Interpolation asset",
+      "phases": [2, 6],
+      "purpose": "OpenUSD parsing and interoperability smoke fixture",
+      "official_url": "https://github.com/usd-wg/assets",
+      "revision": "1b91f3c464891af259d51d9ee9ee9e6c357f7079",
+      "license": "CC-BY-4.0",
+      "attribution": "Academy Software Foundation USD Working Group",
+      "auto_download": true,
+      "license_review_required": false,
+      "expected_rows": 0,
+      "sample_sizes": {"smoke": 0, "standard": 0, "full": 0},
+      "record_format": "files",
+      "artifacts": [
+        {
+          "dest": "primvar_interpolation.usda",
+          "url": "https://raw.githubusercontent.com/usd-wg/assets/1b91f3c464891af259d51d9ee9ee9e6c357f7079/docs/PrimvarInterpolation/primvar_interpolation.usda"
+        }
+      ]
+    },
+    {
+      "id": "nist-pmi-step",
+      "name": "NIST MBE PMI STEP Test Cases",
+      "phases": [2, 4],
+      "purpose": "STEP AP242 interoperability, topology, bounds, and solid validity evaluation",
+      "official_url": "https://www.nist.gov/ctl/smart-connected-systems-division/smart-connected-manufacturing-systems-group/mbe-pmi-0",
+      "revision": "NIST-PMI-STEP-Files 2024-06-19",
+      "license": "NIST unrestricted-use test data; acknowledgement requested",
+      "attribution": "National Institute of Standards and Technology (NIST)",
+      "auto_download": true,
+      "license_review_required": false,
+      "expected_rows": 17,
+      "sample_sizes": {"smoke": 4, "standard": 9, "full": 17},
+      "record_format": "zip",
+      "archive_member_pattern": "^NIST-PMI-STEP-Files/nist_(ctc|ftc|stc)_[0-9]+_.*_ap242.*\\.stp$",
+      "archive_max_member_bytes": 10000000,
+      "archive_max_total_bytes": 100000000,
+      "artifacts": [
+        {
+          "dest": "NIST-PMI-STEP-Files.zip",
+          "url": "https://www.nist.gov/system/files/documents/noindex/2024/06/19/NIST-PMI-STEP-Files.zip",
+          "sha256": "8fa78429e6d8d9b0d7681d223b6aa9ec98c3772185c55b1a0e3679b21c181911"
+        }
+      ]
+    },
+    {
+      "id": "abc-cad",
+      "name": "ABC: A Big CAD Model Dataset",
+      "phases": [2, 4],
+      "purpose": "exact CAD curves and surfaces for geometric accuracy evaluation",
+      "official_url": "https://deep-geometry.github.io/abc-dataset/",
+      "revision": "ABC v00 repository chunks",
+      "license": "CAD model copyrights retained by original creators; Onshape Terms 1.g.ii apply",
+      "attribution": "Koch et al., CVPR 2019",
+      "auto_download": false,
+      "license_review_required": true,
+      "manual_reason": "The corpus is large and model copyrights are retained by their creators. Legal review is required before downloading any chunk.",
+      "expected_rows": 1000000,
+      "sample_sizes": {"smoke": 0, "standard": 0, "full": 1000},
+      "record_format": "archive",
+      "artifacts": []
+    },
+    {
+      "id": "sketchgraphs",
+      "name": "SketchGraphs",
+      "phases": [2, 4],
+      "purpose": "real-world parametric sketch constraint evaluation",
+      "official_url": "https://github.com/PrincetonLIPS/SketchGraphs",
+      "revision": "1f27f5f9459926d38318007c71b72697083b2f3c",
+      "license": "MIT for code; sketch copyrights and Onshape terms are separate",
+      "attribution": "Seff et al.; original sketch creators",
+      "auto_download": false,
+      "license_review_required": true,
+      "manual_reason": "Dataset rights are not identical to the code license. Legal review and explicit local acknowledgement are required.",
+      "expected_rows": 15000000,
+      "sample_sizes": {"smoke": 0, "standard": 0, "full": 1000},
+      "record_format": "archive",
+      "artifacts": []
+    }
+  ],
+  "toolchain_references": [
+    {
+      "id": "openusd",
+      "official_url": "https://github.com/PixarAnimationStudios/OpenUSD",
+      "revision": "c58778b6b5c667123430b6bbed810778bf336e9c",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "owlvit-geneval-evaluator",
+      "official_url": "https://huggingface.co/google/owlvit-base-patch32",
+      "model_id": "google/owlvit-base-patch32",
+      "revision": "cbc355fb364588351c5d51c7f74465e8e7ec6f72",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "grounding-dino-geneval-evaluator",
+      "official_url": "https://huggingface.co/IDEA-Research/grounding-dino-base",
+      "model_id": "IDEA-Research/grounding-dino-base",
+      "revision": "12bdfa3120f3e7ec7b434d90674b3396eccf88eb",
+      "license": "Apache-2.0"
+    }
+  ]
+}

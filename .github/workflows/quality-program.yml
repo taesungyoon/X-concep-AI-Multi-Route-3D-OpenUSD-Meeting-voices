@@ -1,0 +1,57 @@
+name: quality-program-1-2-3-4-6
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 18 * * 1"
+  push:
+    paths:
+      - "전체 풀스택/quality/**"
+      - "전체 풀스택/scripts/sync-quality-datasets.py"
+      - "전체 풀스택/scripts/run-quality-program.py"
+      - "전체 풀스택/scripts/benchmark-local-images.py"
+      - "전체 풀스택/scripts/benchmark-public-cad.py"
+      - "전체 풀스택/scripts/score-geneval-owlvit.py"
+      - "전체 풀스택/python-worker/tests/test_quality_program.py"
+      - ".github/workflows/quality-program.yml"
+  pull_request:
+    paths:
+      - "전체 풀스택/quality/**"
+      - "전체 풀스택/scripts/sync-quality-datasets.py"
+      - "전체 풀스택/scripts/run-quality-program.py"
+      - "전체 풀스택/scripts/benchmark-local-images.py"
+      - "전체 풀스택/scripts/benchmark-public-cad.py"
+      - "전체 풀스택/scripts/score-geneval-owlvit.py"
+      - "전체 풀스택/python-worker/tests/test_quality_program.py"
+
+permissions:
+  contents: read
+
+jobs:
+  reproducible-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install pytest Pillow usd-core
+      - name: Unit contracts
+        working-directory: 전체 풀스택
+        run: python -m pytest python-worker/tests/test_quality_program.py -q
+      - name: Sync pinned public fixtures
+        working-directory: 전체 풀스택
+        run: python scripts/sync-quality-datasets.py --tier smoke
+      - name: Run phases 1,2,3,4,6 smoke gates
+        working-directory: 전체 풀스택
+        run: python scripts/run-quality-program.py --tier smoke
+      - name: Upload quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-program-smoke
+          path: |
+            전체 풀스택/storage/quality-datasets/quality-datasets.lock.json
+            전체 풀스택/storage/quality-program/**

@@ -1,0 +1,5 @@
+--extra-index-url https://pypi.nvidia.com
+ovrtx==0.4.0.346409
+ovstream==0.4.5
+usd-core==26.5
+Pillow==12.3.0

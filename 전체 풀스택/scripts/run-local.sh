@@ -26,7 +26,7 @@ PYTHON_WORKER_URL=http://127.0.0.1:8001 KNOWLEDGE_SERVICE_URL=http://127.0.0.1:8
 cd "$ROOT/control-plane-drf"
 DB_ENGINE=sqlite STORAGE_PATH="$ROOT/storage" AGENT_GATEWAY_URL=http://127.0.0.1:8010 KNOWLEDGE_SERVICE_URL=http://127.0.0.1:8020 DJANGO_DEBUG=true "$PYTHON_BIN" manage.py runserver 127.0.0.1:8000 --noreload & PIDS="$PIDS $!"
 cd "$ROOT"
-CONTROL_PLANE_URL=http://127.0.0.1:8000 MAX_UPLOAD_MB=30 php -S 127.0.0.1:8080 -t frontend-php/public frontend-php/public/router.php & PIDS="$PIDS $!"
+CONTROL_PLANE_URL=http://127.0.0.1:8000 MAX_UPLOAD_MB=30 php -d max_execution_time=0 -d default_socket_timeout=7200 -S 127.0.0.1:8080 -t frontend-php/public frontend-php/public/router.php & PIDS="$PIDS $!"
 
 echo "UI: http://127.0.0.1:8080"
 echo "DRF: http://127.0.0.1:8000/api/system-status"

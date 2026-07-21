@@ -1,4 +1,25 @@
-import { initViewer, loadModel, setView, toggleFullscreen } from './viewer.js';
+let viewerModulePromise;
+const nativeFetch = window.fetch.bind(window);
+const authSession = {
+  token: sessionStorage.getItem('xconcep.auth.token') || '',
+  required: false,
+  user: null,
+};
+window.fetch = (input, init = {}) => {
+  const target = typeof input === 'string' ? input : input.url;
+  if (!authSession.token || !target.startsWith('/api/')) return nativeFetch(input, init);
+  const headers = new Headers(init.headers || (typeof input === 'string' ? undefined : input.headers));
+  headers.set('Authorization', `Bearer ${authSession.token}`);
+  return nativeFetch(input, { ...init, headers });
+};
+function viewerModule() {
+  viewerModulePromise ||= import('./viewer.js');
+  return viewerModulePromise;
+}
+async function initViewer(...args) { return (await viewerModule()).initViewer(...args); }
+async function loadModel(...args) { return (await viewerModule()).loadModel(...args); }
+async function setView(...args) { return (await viewerModule()).setView(...args); }
+async function toggleFullscreen(...args) { return (await viewerModule()).toggleFullscreen(...args); }
 
 const state = { project: null, selected2d: null, files: [], inputMode: 'prompt', meeting: { recorder: null, stream: null, chunks: 0, timer: null, seconds: 0, analyserFrame: null } };
 const qs = (selector) => document.querySelector(selector);
@@ -9,6 +30,76 @@ function selectedOutputGoal() { return qs('input[name="output_goal"]:checked')?.
 function selectedQualityProfile() { return qs('#qualityProfile')?.value || 'standard'; }
 function selectedEngineOverride() { return qs('#engineOverride')?.value || ''; }
 const stages = { 1: qs('#stageInput'), 2: qs('#stageCompare'), 3: qs('#stageResult') };
+
+function setAuthGate(open, message = '') {
+  const gate = qs('#authGate');
+  gate.hidden = !open;
+  qs('#authError').textContent = message;
+  if (open) setTimeout(() => qs('#authUsername').focus(), 0);
+}
+
+function showAuthenticatedUser(user) {
+  authSession.user = user;
+  const label = qs('#authUser');
+  label.textContent = user?.display_name || user?.username || '';
+  label.hidden = !user;
+  qs('#logoutButton').hidden = !user;
+}
+
+async function initializeAuthentication() {
+  try {
+    const configResponse = await nativeFetch('/api/auth/config');
+    const config = await configResponse.json();
+    authSession.required = config.required === true;
+    if (!authSession.required) return;
+    if (authSession.token) {
+      const me = await fetch('/api/auth/me');
+      if (me.ok) {
+        showAuthenticatedUser((await me.json()).user);
+        return;
+      }
+      authSession.token = '';
+      sessionStorage.removeItem('xconcep.auth.token');
+    }
+    setAuthGate(true);
+  } catch {
+    setAuthGate(true, '인증 서버 상태를 확인할 수 없음.');
+  }
+}
+
+qs('#authForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = qs('#authSubmit');
+  button.disabled = true;
+  qs('#authError').textContent = '';
+  try {
+    const response = await nativeFetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: qs('#authUsername').value, password: qs('#authPassword').value }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || '로그인에 실패함.');
+    authSession.token = payload.token;
+    sessionStorage.setItem('xconcep.auth.token', payload.token);
+    qs('#authPassword').value = '';
+    showAuthenticatedUser(payload.user);
+    setAuthGate(false);
+    loadSystemStatus();
+  } catch (error) {
+    setAuthGate(true, error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+qs('#logoutButton').addEventListener('click', () => {
+  authSession.token = '';
+  authSession.user = null;
+  sessionStorage.removeItem('xconcep.auth.token');
+  showAuthenticatedUser(null);
+  setAuthGate(true);
+});
 
 const form = qs('#generateForm');
 const promptInput = qs('#promptInput');
@@ -85,6 +176,36 @@ function stopLoading() {
   }, 320);
 }
 
+const wait = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+async function waitForJob(jobId, projectId, timeoutMs = 2 * 60 * 60 * 1000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const response = await fetch(`/api/jobs/${jobId}`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(json.error || '작업 상태 조회 실패');
+    const job = json.job || {};
+    if (job.status === 'failed') throw new Error(job.error || '백그라운드 작업 실패');
+    if (job.status === 'completed') {
+      const projectResponse = await fetch(`/api/projects/${projectId}`);
+      const projectJson = await projectResponse.json();
+      if (!projectResponse.ok) throw new Error(projectJson.error || '완료된 프로젝트 조회 실패');
+      return projectJson.project;
+    }
+    if (Number.isFinite(Number(job.progress))) {
+      updateLoading(Math.max(8, Math.min(92, Number(job.progress))), '백그라운드 작업을 처리하고 있음', job.progress > 65 ? 2 : job.progress > 30 ? 1 : 0);
+    }
+    await wait(1500);
+  }
+  throw new Error('작업 대기 시간이 초과됨');
+}
+
+async function resolveProject(response, json, fallbackMessage) {
+  if (!response.ok) throw new Error(json.error || fallbackMessage);
+  if (json.job?.id) return waitForJob(json.job.id, json.project.id);
+  return json.project;
+}
+
 function renderFilePreviews() {
   uploadPreview.innerHTML = '';
   state.files.forEach((file, index) => {
@@ -112,11 +233,11 @@ function syncInputFiles() {
 }
 
 function addFiles(files) {
-  const accepted = [...files].filter(file => ['image/jpeg', 'image/png', 'image/webp'].includes(file.type));
+  const accepted = [...files].filter(file => ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size <= 12 * 1024 * 1024);
   state.files = [...state.files, ...accepted].slice(0, 4);
   syncInputFiles();
   renderFilePreviews();
-  if (accepted.length !== files.length) showToast('JPG, PNG, WEBP 이미지만 사용할 수 있음');
+  if (accepted.length !== files.length) showToast('JPG, PNG, WEBP 형식의 12MB 이하 이미지만 사용할 수 있음');
 }
 
 imageInput.addEventListener('change', () => { state.files = []; addFiles(imageInput.files); });
@@ -294,8 +415,7 @@ async function generateMeeting2d() {
   try {
     const response = await fetch(`/api/projects/${state.project.id}/meeting/generate-2d`, { method: 'POST' });
     const json = await response.json();
-    if (!response.ok) throw new Error(json.error || '회의 기반 2D 생성 실패');
-    state.project = json.project;
+    state.project = await resolveProject(response, json, '회의 기반 2D 생성 실패');
     renderCompare();
     setStage(2);
   } catch (error) { showToast(error.message); }
@@ -318,8 +438,7 @@ form.addEventListener('submit', async (event) => {
   try {
     const response = await fetch('/api/projects', { method: 'POST', body: data });
     const json = await response.json();
-    if (!response.ok) throw new Error(json.error || '2D 생성 실패');
-    state.project = json.project;
+    state.project = await resolveProject(response, json, '2D 생성 실패');
     renderCompare();
     setStage(2);
   } catch (error) {
@@ -366,8 +485,7 @@ generate3dButton.addEventListener('click', async () => {
       })
     });
     const json = await response.json();
-    if (!response.ok) throw new Error(json.error || '3D 생성 실패');
-    state.project = json.project;
+    state.project = await resolveProject(response, json, '3D 생성 실패');
     await renderResult();
     setStage(3);
   } catch (error) {
@@ -464,8 +582,7 @@ async function regenerateWithGoal(goal) {
       })
     });
     const json = await response.json();
-    if (!response.ok) throw new Error(json.error || '재생성 실패');
-    state.project = json.project;
+    state.project = await resolveProject(response, json, '재생성 실패');
     await renderResult();
     showToast(`${goalLabels[goal] || goal} 결과를 추가함`);
   } catch (error) { showToast(error.message); }
@@ -480,7 +597,7 @@ qs('#validationDetailsButton').addEventListener('click', () => {
 qsa('[data-regenerate-goal]').forEach(button => button.addEventListener('click', () => regenerateWithGoal(button.dataset.regenerateGoal)));
 qs('#editPromptButton').addEventListener('click', () => setStage(1));
 qs('#newProjectButton').addEventListener('click', () => {
-  stopMeeting(); state.project = null; state.selected2d = null; state.files = []; state.meeting.chunks = 0; manualTranscript.value = ''; transcriptStream.innerHTML = '<div class="empty-transcript">회의를 시작하거나 내용을 직접 입력함</div>'; generateMeeting2dButton.disabled = true;
+  stopMeeting(); updateMeetingBadge('대기', false); qs('#recordTime').textContent = '00:00'; state.project = null; state.selected2d = null; state.files = []; state.meeting.chunks = 0; manualTranscript.value = ''; transcriptStream.innerHTML = '<div class="empty-transcript">회의를 시작하거나 내용을 직접 입력함</div>'; generateMeeting2dButton.disabled = true;
   form.reset(); uploadPreview.innerHTML = ''; compareGrid.innerHTML = ''; promptInput.dispatchEvent(new Event('input'));
   qsa('.type-card').forEach((c, i) => c.classList.toggle('selected', i === 0)); qsa('.goal-card').forEach((c, i) => c.classList.toggle('selected', i === 0));
   setStage(1);
@@ -530,7 +647,7 @@ function closeHistory() { historyDrawer.classList.remove('open'); historyDrawer.
 qs('#historyButton').addEventListener('click', openHistory);
 qsa('[data-close-history]').forEach(el => el.addEventListener('click', closeHistory));
 function labelCategory(value) { return ({ equipment: '설비', module: '모듈', part: '부품' })[value] || value; }
-function labelStatus(value) { return ({ completed: '3D 완료', '2d_ready': '2D 완료', generating_3d: '3D 생성 중' })[value] || value; }
+function labelStatus(value) { return ({ completed: '3D 완료', '2d_ready': '2D 완료', generating_3d: '3D 생성 중', queued_2d: '2D 대기 중', queued_3d: '3D 대기 중' })[value] || value; }
 function escapeHtml(value) { const div = document.createElement('div'); div.textContent = String(value ?? ''); return div.innerHTML; }
 function safeAssetUrl(value) {
   const url = String(value || '').trim();
@@ -551,14 +668,14 @@ async function loadSystemStatus() {
     const json = await response.json();
     const worker = json.worker || {};
     const values = [
-      { label: `GPT Image · ${worker.image?.model || 'configured'}`, active: worker.image?.mode !== 'mock' },
-      { label: `${worker.llm?.model || 'Gemma local'} · vLLM/Ray`, active: worker.llm?.mode !== 'mock' },
-      { label: 'Hunyuan3D Local', active: worker.hunyuan3d?.mode !== 'mock' },
-      { label: 'OpenSCAD Structure', active: Boolean(worker.openscad?.binary) || worker.openscad?.mode === 'mock' },
-      { label: 'Blender Asset Bridge', active: Boolean(worker.blender?.binary) || worker.blender?.mode === 'mock' },
-      { label: `Speech · ${worker.speech?.model || 'local'}`, active: worker.speech?.mode !== 'mock' },
+      { label: `${worker.image?.mode === 'openai' ? 'OpenAI Images' : worker.image?.mode === 'comfyui' ? 'ComfyUI FLUX' : 'Image Mock'} · ${worker.image?.model || '미연결'}`, active: worker.image?.configured === true },
+      { label: `${worker.llm?.model || 'Local LLM'} · ${worker.llm?.backend || '미연결'}`, active: worker.llm?.connected === true },
+      { label: `${worker.image_to_3d?.provider === 'triposr' ? 'TripoSR Local' : 'Image-to-3D'} · ${worker.image_to_3d?.mode || '미연결'}`, active: worker.image_to_3d?.connected === true },
+      { label: 'OpenSCAD Structure', active: worker.openscad?.available === true },
+      { label: 'Blender Asset Bridge', active: worker.blender?.available === true },
+      { label: `Speech · ${worker.speech?.model || 'local'}`, active: worker.speech?.connected === true },
       { label: 'OpenUSD Layers', active: worker.openusd?.enabled === true },
-      { label: 'Omniverse Kit · PhysX', active: worker.omniverse?.enabled === true },
+      { label: 'Omniverse Kit · PhysX', active: worker.omniverse?.kit === true },
       { label: 'Nucleus · WebRTC', active: worker.omniverse?.webrtc === true },
     ];
     strip.innerHTML = values.map(item => `<span class="${item.active ? 'active' : 'mock'}"><i></i>${item.label}</span>`).join('');
@@ -567,3 +684,4 @@ async function loadSystemStatus() {
   }
 }
 loadSystemStatus();
+initializeAuthentication();

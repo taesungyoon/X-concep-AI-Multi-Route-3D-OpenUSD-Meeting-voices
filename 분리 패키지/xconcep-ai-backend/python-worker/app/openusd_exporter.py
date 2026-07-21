@@ -297,7 +297,7 @@ def _write_meeting_layer(path: Path, metadata: dict[str, Any], meeting_analysis:
         f"    custom int xconcep_revision = {revision}",
         f'    custom string xconcep_meetingSummary = "{_escape(str(analysis.get("summary", "")))}"',
         f'    custom string xconcep_revisionNote = "{_escape(str(analysis.get("revision_note", "")))}"',
-        f'    custom string xconcep_pipeline = "GPT Image API + Gemma local vLLM/Ray + Hunyuan3D/OpenSCAD/Blender + Omniverse OpenUSD"',
+        f'    custom string xconcep_pipeline = "ComfyUI/OpenAI Images + Gemma local vLLM/Ray + TripoSR/OpenSCAD/Blender + Omniverse OpenUSD"',
         "}",
         "",
     ]
@@ -345,7 +345,7 @@ def _write_usda(
         '    custom string xconcep_selectedConcept = "' + _escape(str(metadata.get("selected_concept_id", ""))) + '"',
         f"    custom int xconcep_revision = {revision}",
         '    custom string xconcep_meetingSummary = "' + _escape(str(analysis.get("summary", ""))) + '"',
-        '    custom string xconcep_pipeline = "GPT Image API + Gemma local + Hunyuan3D/OpenSCAD/Blender + Omniverse"',
+        '    custom string xconcep_pipeline = "ComfyUI/OpenAI Images + Gemma local + TripoSR/OpenSCAD/Blender + Omniverse"',
     ]
     if enable_physics:
         lines.extend([
@@ -424,7 +424,7 @@ def _write_usdc(
         "xconcep:category": metadata.get("category", ""),
         "xconcep:selectedConcept": metadata.get("selected_concept_id", ""),
         "xconcep:meetingSummary": analysis.get("summary", ""),
-        "xconcep:pipeline": "GPT Image API + Gemma local + Hunyuan3D/OpenSCAD/Blender + Omniverse",
+        "xconcep:pipeline": "ComfyUI/OpenAI Images + Gemma local + TripoSR/OpenSCAD/Blender + Omniverse",
     }
     for key, value in attrs.items():
         world_prim.CreateAttribute(key, Sdf.ValueTypeNames.String, custom=True).Set(str(value))

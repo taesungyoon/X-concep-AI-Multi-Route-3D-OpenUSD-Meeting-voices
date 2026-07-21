@@ -24,6 +24,7 @@ class LocalSpeechClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._model = None
+        self._whisper_device = ""
 
     def transcribe(self, audio_path: Path, language: str = "ko", chunk_index: int = 0) -> dict[str, Any]:
         if not audio_path.exists():
@@ -76,12 +77,50 @@ class LocalSpeechClient:
             from faster_whisper import WhisperModel  # type: ignore
         except ImportError as exc:
             raise RuntimeError("faster-whisper가 설치되지 않음. requirements-speech.txt를 설치해야 함") from exc
-        if self._model is None:
-            self._model = WhisperModel(
-                self.settings.whisper_model,
-                device=self.settings.whisper_device,
-                compute_type=self.settings.whisper_compute_type,
+        requested_device = self.settings.whisper_device.strip().lower()
+        device = self._resolve_whisper_device(requested_device)
+        try:
+            result_segments, text_parts, info = self._run_whisper(
+                WhisperModel, audio_path, language, device
             )
+        except Exception:
+            if requested_device != "auto" or device == "cpu":
+                raise
+            self._model = None
+            result_segments, text_parts, info = self._run_whisper(
+                WhisperModel, audio_path, language, "cpu"
+            )
+        return {
+            "text": " ".join(text_parts),
+            "segments": result_segments,
+            "language": getattr(info, "language", language),
+            "duration": float(getattr(info, "duration", result_segments[-1]["end"] if result_segments else 0.0)),
+            "provider": "faster-whisper local",
+        }
+
+    @staticmethod
+    def _resolve_whisper_device(requested_device: str) -> str:
+        if requested_device != "auto":
+            return requested_device
+        try:
+            import ctranslate2  # type: ignore
+            return "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+        except Exception:
+            return "cpu"
+
+    def _run_whisper(self, model_class: Any, audio_path: Path, language: str, device: str):
+        if self._model is None or self._whisper_device != device:
+            self.settings.whisper_model_cache.mkdir(parents=True, exist_ok=True)
+            compute_type = self.settings.whisper_compute_type
+            if compute_type.strip().lower() == "auto":
+                compute_type = "float16" if device == "cuda" else "int8"
+            self._model = model_class(
+                self.settings.whisper_model,
+                device=device,
+                compute_type=compute_type,
+                download_root=str(self.settings.whisper_model_cache),
+            )
+            self._whisper_device = device
         segments, info = self._model.transcribe(
             str(audio_path),
             language=language or None,
@@ -91,26 +130,19 @@ class LocalSpeechClient:
         )
         result_segments = []
         text_parts = []
-        for index, segment in enumerate(segments):
+        for segment in segments:
             text = segment.text.strip()
             if not text:
                 continue
-            speaker = "SPEAKER_00"
             result_segments.append({
                 "start": float(segment.start),
                 "end": float(segment.end),
-                "speaker": speaker,
+                "speaker": "SPEAKER_00",
                 "text": text,
                 "confidence": max(0.0, min(1.0, 1.0 - float(getattr(segment, "no_speech_prob", 0.2)))),
             })
             text_parts.append(text)
-        return {
-            "text": " ".join(text_parts),
-            "segments": result_segments,
-            "language": getattr(info, "language", language),
-            "duration": float(getattr(info, "duration", result_segments[-1]["end"] if result_segments else 0.0)),
-            "provider": "faster-whisper local",
-        }
+        return result_segments, text_parts, info
 
     def _nvidia_nim(self, audio_path: Path, language: str) -> dict[str, Any]:
         headers = {}

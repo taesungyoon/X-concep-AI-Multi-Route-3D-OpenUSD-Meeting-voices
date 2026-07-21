@@ -16,7 +16,8 @@
 | NVIDIA Cosmos | 선택 Physical AI Scenario | Model·Weight·Dataset별 License 확인함 |
 | DeepStream / Metropolis / TAO | 선택 Factory Vision | SDK·Model·Container별 조건 확인함 |
 | Qdrant | Vector DB | Apache-2.0 공개 서버·Client 확인함 |
-| Hunyuan3D | 로컬 3D 생성 | Community License·지역·상업 배포 조건 법무 검토함 |
+| TripoSR | 로컬 이미지 기반 3D 생성 | 코드·모델 MIT License 확인함 |
+| Hunyuan3D 2.0/2.1 | 미채택 | 대한민국이 라이선스 허용 지역에 포함되지 않아 운영 스택에서 제외함 |
 | GPT Image API | 외부 2D 생성 | OpenAI 이용약관·데이터 처리·과금 정책 확인함 |
 | Three.js | Web GLB Viewer | MIT License 확인함 |
 | Django / DRF / FastAPI | Web·API | 각 BSD/MIT License 확인함 |

@@ -4,7 +4,8 @@ services:
     ports: ["${WEB_PORT:-8080}:80"]
     environment:
       CONTROL_PLANE_URL: http://control-plane:8000
-      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-30}
+      CONTROL_PLANE_TOKEN: ${INTERNAL_API_TOKEN:-}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-128}
     volumes:
       - ./storage:/var/www/html/storage
     depends_on:
@@ -16,18 +17,52 @@ services:
     environment: &control_env
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
+      CORS_ALLOW_ALL: ${CORS_ALLOW_ALL:-false}
+      MAX_IMAGE_UPLOAD_MB: ${MAX_IMAGE_UPLOAD_MB:-12}
+      MAX_AUDIO_UPLOAD_MB: ${MAX_AUDIO_UPLOAD_MB:-30}
+      MAX_REQUEST_UPLOAD_MB: ${MAX_REQUEST_UPLOAD_MB:-128}
       DB_ENGINE: ${DB_ENGINE:-mysql}
-      MYSQL_HOST: mysql
+      MYSQL_HOST: ${MYSQL_HOST:-mysql}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-xconcep}
       MYSQL_USER: ${MYSQL_USER:-xconcep}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-xconcep}
+      MYSQL_CONN_MAX_AGE: ${MYSQL_CONN_MAX_AGE:-60}
+      MYSQL_SSL_CA: ${MYSQL_SSL_CA:-}
+      DB_CONNECT_RETRIES: ${DB_CONNECT_RETRIES:-60}
+      AUTH_MODE: ${AUTH_MODE:-internal_db}
+      AUTH_TOKEN_TTL_SECONDS: ${AUTH_TOKEN_TTL_SECONDS:-28800}
+      INTERNAL_AUTH_BOOTSTRAP_ENABLED: ${INTERNAL_AUTH_BOOTSTRAP_ENABLED:-false}
+      INTERNAL_AUTH_USERNAME: ${INTERNAL_AUTH_USERNAME:-internal_admin}
+      INTERNAL_AUTH_PASSWORD: ${INTERNAL_AUTH_PASSWORD:-}
+      INTERNAL_AUTH_DISPLAY_NAME: ${INTERNAL_AUTH_DISPLAY_NAME:-내부 테스트 관리자}
+      INTERNAL_AUTH_EMAIL: ${INTERNAL_AUTH_EMAIL:-internal-admin@example.test}
+      AUTH_DB_ENGINE: ${AUTH_DB_ENGINE:-mysql}
+      AUTH_DB_HOST: ${AUTH_DB_HOST:-}
+      AUTH_DB_PORT: ${AUTH_DB_PORT:-3306}
+      AUTH_DB_NAME: ${AUTH_DB_NAME:-}
+      AUTH_DB_USER: ${AUTH_DB_USER:-}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-}
+      AUTH_DB_CONN_MAX_AGE: ${AUTH_DB_CONN_MAX_AGE:-60}
+      AUTH_DB_CONNECT_TIMEOUT: ${AUTH_DB_CONNECT_TIMEOUT:-5}
+      AUTH_DB_SSL_CA: ${AUTH_DB_SSL_CA:-}
+      AUTH_DB_TABLE: ${AUTH_DB_TABLE:-employees}
+      AUTH_DB_ID_COLUMN: ${AUTH_DB_ID_COLUMN:-id}
+      AUTH_DB_USERNAME_COLUMN: ${AUTH_DB_USERNAME_COLUMN:-username}
+      AUTH_DB_PASSWORD_COLUMN: ${AUTH_DB_PASSWORD_COLUMN:-password_hash}
+      AUTH_DB_DISPLAY_NAME_COLUMN: ${AUTH_DB_DISPLAY_NAME_COLUMN:-display_name}
+      AUTH_DB_EMAIL_COLUMN: ${AUTH_DB_EMAIL_COLUMN:-email}
+      AUTH_DB_ACTIVE_COLUMN: ${AUTH_DB_ACTIVE_COLUMN:-is_active}
+      AUTH_DB_PASSWORD_SCHEME: ${AUTH_DB_PASSWORD_SCHEME:-django_hash}
+      AUTH_DB_USERNAME_CASE_SENSITIVE: ${AUTH_DB_USERNAME_CASE_SENSITIVE:-false}
       STORAGE_PATH: /app/storage
       AGENT_GATEWAY_URL: http://agent-layer:8010
       KNOWLEDGE_SERVICE_URL: http://knowledge-service:8020
       QDRANT_URL: http://qdrant:6333
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      SYNC_PIPELINE: ${SYNC_PIPELINE:-true}
+      SYNC_PIPELINE: ${SYNC_PIPELINE:-false}
     volumes: ["./storage:/app/storage"]
     depends_on:
       mysql: {condition: service_healthy}
@@ -42,11 +77,11 @@ services:
 
   celery-worker:
     build: ./control-plane-drf
-    command: celery -A config.celery app worker -l INFO
+    command: celery -A config.celery worker -l INFO
     environment: *control_env
     volumes: ["./storage:/app/storage"]
     depends_on: [control-plane, redis]
-    profiles: ["async"]
+    restart: unless-stopped
 
   agent-layer:
     build:
@@ -101,11 +136,41 @@ services:
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-local-not-required}
       GEMMA_MODEL_NAME: ${GEMMA_MODEL_NAME:-gemma-4-64b-local}
-      OPENAI_IMAGE_MODE: ${OPENAI_IMAGE_MODE:-mock}
+      OPENAI_IMAGE_MODE: ${OPENAI_IMAGE_MODE:-comfyui}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_ORGANIZATION: ${OPENAI_ORGANIZATION:-}
+      OPENAI_PROJECT: ${OPENAI_PROJECT:-}
       OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-2}
-      HUNYUAN_MODE: ${HUNYUAN_MODE:-mock}
-      HUNYUAN_API_URL: ${HUNYUAN_API_URL:-http://host.docker.internal:8081}
+      OPENAI_IMAGE_SIZE: ${OPENAI_IMAGE_SIZE:-1536x1024}
+      OPENAI_IMAGE_QUALITY: ${OPENAI_IMAGE_QUALITY:-medium}
+      OPENAI_IMAGE_OUTPUT_FORMAT: ${OPENAI_IMAGE_OUTPUT_FORMAT:-png}
+      OPENAI_IMAGE_TIMEOUT_SECONDS: ${OPENAI_IMAGE_TIMEOUT_SECONDS:-600}
+      OPENAI_IMAGE_MAX_REQUESTS_PER_DAY: ${OPENAI_IMAGE_MAX_REQUESTS_PER_DAY:-20}
+      OPENAI_IMAGE_ESTIMATED_COST_USD: ${OPENAI_IMAGE_ESTIMATED_COST_USD:-0}
+      OPENAI_IMAGE_MAX_ESTIMATED_COST_USD_PER_DAY: ${OPENAI_IMAGE_MAX_ESTIMATED_COST_USD_PER_DAY:-0}
+      OPENAI_IMAGE_USAGE_DB: ${OPENAI_IMAGE_USAGE_DB:-/app/storage/usage/openai-image.sqlite3}
+      COMFYUI_BASE_URL: ${COMFYUI_BASE_URL:-http://host.docker.internal:8188}
+      COMFYUI_API_KEY: ${COMFYUI_API_KEY:-}
+      COMFYUI_TIMEOUT_SECONDS: ${COMFYUI_TIMEOUT_SECONDS:-900}
+      COMFYUI_UNET_MODEL: ${COMFYUI_UNET_MODEL:-flux-2-klein-base-4b-fp8.safetensors}
+      COMFYUI_CLIP_MODEL: ${COMFYUI_CLIP_MODEL:-qwen_3_4b.safetensors}
+      COMFYUI_VAE_MODEL: ${COMFYUI_VAE_MODEL:-flux2-vae.safetensors}
+      COMFYUI_WIDTH: ${COMFYUI_WIDTH:-1024}
+      COMFYUI_HEIGHT: ${COMFYUI_HEIGHT:-1024}
+      COMFYUI_STEPS: ${COMFYUI_STEPS:-20}
+      COMFYUI_CFG: ${COMFYUI_CFG:-5.0}
+      COMFYUI_MAX_ATTEMPTS: ${COMFYUI_MAX_ATTEMPTS:-2}
+      IMAGE_CONCEPT_COUNT: ${IMAGE_CONCEPT_COUNT:-4}
+      IMAGE_MIN_WIDTH: ${IMAGE_MIN_WIDTH:-768}
+      IMAGE_MIN_HEIGHT: ${IMAGE_MIN_HEIGHT:-768}
+      IMAGE_MIN_FILE_BYTES: ${IMAGE_MIN_FILE_BYTES:-10000}
+      IMAGE_MIN_CHANNEL_STDDEV: ${IMAGE_MIN_CHANNEL_STDDEV:-3.0}
+      IMAGE_REQUIRE_EXPECTED_ASPECT: ${IMAGE_REQUIRE_EXPECTED_ASPECT:-true}
+      SHAPE_MODE: ${SHAPE_MODE:-triposr}
+      SHAPE_PROVIDER: ${SHAPE_PROVIDER:-triposr}
+      SHAPE_API_URL: ${SHAPE_API_URL:-http://host.docker.internal:8081}
+      SHAPE_TIMEOUT_SECONDS: ${SHAPE_TIMEOUT_SECONDS:-1800}
       OPENSCAD_MODE: ${OPENSCAD_MODE:-auto}
       OPENSCAD_BIN: ${OPENSCAD_BIN:-openscad}
       OPENSCAD_TIMEOUT_SECONDS: ${OPENSCAD_TIMEOUT_SECONDS:-600}
@@ -121,9 +186,12 @@ services:
       NEMO_DIARIZER_CONFIG: ${NEMO_DIARIZER_CONFIG:-}
       DIARIZATION_MODE: ${DIARIZATION_MODE:-none}
       WHISPER_MODEL: ${WHISPER_MODEL:-large-v3-turbo}
-      WHISPER_DEVICE: ${WHISPER_DEVICE:-cuda}
-      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-float16}
+      WHISPER_MODEL_CACHE: ${WHISPER_MODEL_CACHE:-/app/storage/models/whisper}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-auto}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-auto}
       NVIDIA_ASR_URL: ${NVIDIA_ASR_URL:-http://host.docker.internal:9000}
+      NVIDIA_ASR_API_KEY: ${NVIDIA_ASR_API_KEY:-}
+      PYANNOTE_TOKEN: ${PYANNOTE_TOKEN:-}
       OPENUSD_GENERATE_USDC: ${OPENUSD_GENERATE_USDC:-true}
       OMNIVERSE_ENABLED: ${OMNIVERSE_ENABLED:-true}
       OMNIVERSE_GENERATE_LAYERS: ${OMNIVERSE_GENERATE_LAYERS:-true}
@@ -164,6 +232,7 @@ services:
 
   mysql:
     image: mysql:8.4
+    ports: ["127.0.0.1:${MYSQL_HOST_PORT:-3307}:3306"]
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-xconcep}
       MYSQL_USER: ${MYSQL_USER:-xconcep}

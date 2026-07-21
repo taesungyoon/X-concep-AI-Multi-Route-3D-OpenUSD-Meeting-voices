@@ -2,6 +2,15 @@ import os
 from pathlib import Path
 
 os.environ["STORAGE_PATH"] = str(Path(__file__).parent / "tmp_storage")
+os.environ["PIPELINE_MODE"] = "mock"
+os.environ["LLM_MODE"] = "mock"
+os.environ["OPENAI_IMAGE_MODE"] = "mock"
+os.environ["SHAPE_MODE"] = "mock"
+os.environ["SPEECH_MODE"] = "mock"
+os.environ["OPENSCAD_MODE"] = "mock"
+os.environ["OPENSCAD_BIN"] = "__test_missing_openscad__"
+os.environ["BLENDER_MODE"] = "mock"
+os.environ["BLENDER_BIN"] = "__test_missing_blender__"
 
 from fastapi.testclient import TestClient
 from app.main import app
@@ -13,6 +22,8 @@ def test_health():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+    assert response.json()["execution_profile"] == "mock"
+    assert response.json()["runtime_ready"] is False
 
 
 def test_full_generation_flow():

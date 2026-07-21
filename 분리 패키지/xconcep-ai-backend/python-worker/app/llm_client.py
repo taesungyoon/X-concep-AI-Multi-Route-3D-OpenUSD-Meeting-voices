@@ -26,7 +26,7 @@ class LocalGemmaClient:
     def analyze(self, prompt: str, category: str, image_paths: list[str]) -> dict[str, Any]:
         if self.settings.llm_mode == "mock":
             return self._fallback(prompt, category, image_paths)
-        if self.settings.llm_mode != "vllm":
+        if self.settings.llm_mode not in {"vllm", "openai_compatible", "ollama"}:
             raise RuntimeError(f"지원하지 않는 LLM_MODE: {self.settings.llm_mode}")
 
         content: list[dict[str, Any]] = [

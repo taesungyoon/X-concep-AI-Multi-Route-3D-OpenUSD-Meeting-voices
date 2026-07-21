@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import shutil
-from pathlib import Path
+import importlib.util
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+import httpx
 import trimesh
 
 from . import generator as generator_module
@@ -53,8 +55,14 @@ class GenerationPipeline:
             "results": results,
             "analysis": analysis,
             "pipeline": {
-                "llm": "Gemma local via vLLM/Ray" if self.settings.llm_mode == "vllm" else "mock",
-                "image": f"OpenAI {self.settings.openai_image_model}" if self.settings.openai_image_mode == "openai" else "mock",
+                "llm": f"OpenAI-compatible ({self.settings.llm_mode})" if self.settings.llm_mode != "mock" else "mock",
+                "image": (
+                    f"OpenAI {self.settings.openai_image_model}"
+                    if self.settings.openai_image_mode == "openai"
+                    else f"ComfyUI {self.settings.comfyui_unet_model}"
+                    if self.settings.openai_image_mode == "comfyui"
+                    else "mock"
+                ),
                 "external_services": ["OpenAI Image API"] if self.settings.openai_image_mode == "openai" else [],
                 "available_3d_routes": ["hunyuan3d", "openscad", "blender", "hybrid"],
             },
@@ -206,7 +214,7 @@ class GenerationPipeline:
             shutil.copy2(mock_glb, glb_path)
             shutil.copy2(mock_stl, stl_path)
             shutil.copy2(mock_preview, preview_path)
-            provider = {"mode": "mock", "engine": "hunyuan3d"}
+            provider = {"mode": "mock", "engine": self.settings.shape_provider}
         else:
             provider = self.hunyuan.generate(selected_path, glb_path)
             self._glb_to_stl(glb_path, stl_path)
@@ -217,7 +225,7 @@ class GenerationPipeline:
             "glb_url": self._public_url(request.project_id, "result/fast/model_fast.glb"),
             "stl_url": self._public_url(request.project_id, "result/fast/model_fast.stl"),
             "preview_url": self._public_url(request.project_id, "result/fast/render_fast.png"),
-            "tags": ["빠른 3D", "Hunyuan3D", "Mesh", "GLB", "STL"],
+            "tags": ["빠른 3D", self.settings.shape_provider, "Mesh", "GLB", "STL"],
             "provider": provider,
             "usage_scope": ["빠른 외형 확인", "웹 3D 검토", "Blender 후처리 기초 Mesh"],
             "absolute_paths": {"glb": str(glb_path), "stl": str(stl_path), "preview": str(preview_path)},
@@ -371,30 +379,85 @@ class GenerationPipeline:
         return patch
 
     def health(self) -> dict[str, Any]:
+        llm_connected = self._probe_http(self.settings.vllm_base_url, "/models") if self.settings.llm_mode != "mock" else False
+        hunyuan_connected = self._probe_http(self.settings.hunyuan_api_url, "/health") if self.settings.hunyuan_mode != "mock" else False
+        if self.settings.speech_mode == "nvidia_nim":
+            speech_connected = self._probe_http(self.settings.nvidia_asr_url, "/health/ready")
+        elif self.settings.speech_mode == "faster_whisper":
+            speech_connected = importlib.util.find_spec("faster_whisper") is not None
+        elif self.settings.speech_mode == "nemo_asr":
+            speech_connected = importlib.util.find_spec("nemo") is not None
+        else:
+            speech_connected = False
+        image_connected = (
+            self._probe_http(self.settings.comfyui_base_url, "/system_stats")
+            if self.settings.openai_image_mode == "comfyui"
+            else None
+        )
+        image_configured = (
+            image_connected
+            if self.settings.openai_image_mode == "comfyui"
+            else self.settings.openai_image_mode == "openai" and bool(self.settings.openai_api_key)
+        )
+        image_usage = self.images.usage.today() if self.settings.openai_image_mode == "openai" else None
+        openscad_binary = shutil.which(self.settings.openscad_bin)
+        blender_binary = shutil.which(self.settings.blender_bin)
+        live_3d = hunyuan_connected or bool(openscad_binary) or bool(blender_binary)
+        runtime_ready = llm_connected and image_configured and live_3d
+        if runtime_ready:
+            execution_profile = "live"
+        elif any([llm_connected,image_configured,hunyuan_connected,openscad_binary,blender_binary,speech_connected]):
+            execution_profile = "partial"
+        else:
+            execution_profile = "mock"
         return {
             "status": "ok",
             "service": "python-worker",
             "pipeline_mode": self.settings.pipeline_mode,
-            "llm": {"mode": self.settings.llm_mode, "endpoint": self.settings.vllm_base_url, "model": self.settings.gemma_model_name},
-            "image": {"mode": self.settings.openai_image_mode, "model": self.settings.openai_image_model, "external": self.settings.openai_image_mode == "openai"},
-            "hunyuan3d": {"mode": self.settings.hunyuan_mode, "endpoint": self.settings.hunyuan_api_url, "role": "fast_or_freeform_mesh"},
-            "openscad": {"mode": self.settings.openscad_mode, "binary": shutil.which(self.settings.openscad_bin), "role": "parametric_structure"},
-            "blender": {"mode": self.settings.blender_mode, "binary": shutil.which(self.settings.blender_bin), "role": "assembly_render_usd_bridge"},
+            "execution_profile": execution_profile,
+            "runtime_ready": runtime_ready,
+            "llm": {"mode": self.settings.llm_mode, "backend": "OpenAI-compatible" if self.settings.llm_mode != "mock" else "mock", "endpoint": self.settings.vllm_base_url, "model": self.settings.gemma_model_name, "connected": llm_connected},
+            "image": {
+                "mode": self.settings.openai_image_mode,
+                "model": self.settings.comfyui_unet_model if self.settings.openai_image_mode == "comfyui" else self.settings.openai_image_model,
+                "endpoint": self.settings.comfyui_base_url if self.settings.openai_image_mode == "comfyui" else None,
+                "external": self.settings.openai_image_mode == "openai",
+                "configured": bool(image_configured),
+                "connected": image_connected,
+                "usage_today": image_usage,
+                "guardrails": {
+                    "max_requests_per_day": self.settings.openai_image_max_requests_per_day,
+                    "estimated_cost_usd_per_image": self.settings.openai_image_estimated_cost_usd,
+                    "max_estimated_cost_usd_per_day": self.settings.openai_image_max_estimated_cost_usd_per_day,
+                } if self.settings.openai_image_mode == "openai" else None,
+            },
+            "image_to_3d": {"mode": self.settings.hunyuan_mode, "provider": self.settings.shape_provider, "endpoint": self.settings.hunyuan_api_url, "role": "fast_or_freeform_mesh", "connected": hunyuan_connected, "route_alias": "hunyuan3d"},
+            "openscad": {"mode": self.settings.openscad_mode, "binary": openscad_binary, "available": bool(openscad_binary), "role": "parametric_structure"},
+            "blender": {"mode": self.settings.blender_mode, "binary": blender_binary, "available": bool(blender_binary), "role": "assembly_render_usd_bridge"},
             "routing": {"enabled": True, "low_confidence": self.settings.routing_low_confidence, "high_confidence": self.settings.routing_high_confidence},
-            "speech": {"mode": self.settings.speech_mode, "model": self.settings.whisper_model if self.settings.speech_mode == "faster_whisper" else self.settings.speech_mode, "local": True},
+            "speech": {"mode": self.settings.speech_mode, "model": self.settings.whisper_model if self.settings.speech_mode == "faster_whisper" else self.settings.speech_mode, "local": True, "connected": speech_connected},
             "omniverse": {
                 "enabled": self.settings.omniverse_enabled,
                 "nucleus_url": self.settings.omniverse_nucleus_url or None,
                 "stream_url": self.settings.omniverse_stream_url or None,
-                "kit": True,
+                "kit": False,
                 "webrtc": bool(self.settings.omniverse_stream_url),
                 "physx": self.settings.omniverse_enable_physics,
                 "variants": self.settings.omniverse_enable_variants,
-                "asset_validator": True,
-                "asset_converter": True,
+                "asset_validator": False,
+                "asset_converter": False,
             },
             "openusd": {"enabled": True, "usdc_requested": self.settings.openusd_generate_usdc, "layered_package": self.settings.omniverse_generate_layers},
         }
+
+    @staticmethod
+    def _probe_http(base_url: str, path: str) -> bool:
+        try:
+            with httpx.Client(timeout=1.5) as client:
+                response = client.get(base_url.rstrip("/") + path)
+                return response.status_code < 500
+        except Exception:
+            return False
 
     def _glb_to_stl(self, glb_path: Path, stl_path: Path) -> None:
         scene = trimesh.load(glb_path, force="scene")
@@ -424,10 +487,19 @@ class GenerationPipeline:
         cleaned = value.replace("\\", "/")
         if cleaned.startswith("/storage/"):
             cleaned = cleaned[len("/storage/"):]
+            candidate = (root / cleaned).resolve()
         elif cleaned.startswith("storage/"):
             cleaned = cleaned[len("storage/"):]
-        source = Path(cleaned)
-        candidate = source.resolve() if source.is_absolute() else (root / cleaned.lstrip("/")).resolve()
+            candidate = (root / cleaned).resolve()
+        else:
+            native_path = Path(value)
+            windows_path = PureWindowsPath(value)
+            if native_path.is_absolute():
+                candidate = native_path.resolve()
+            elif PurePosixPath(cleaned).is_absolute() or windows_path.is_absolute() or windows_path.drive:
+                raise ValueError("STORAGE_PATH 외부 경로 접근은 허용되지 않음")
+            else:
+                candidate = (root / cleaned).resolve()
         if candidate != root and root not in candidate.parents:
             raise ValueError("STORAGE_PATH 외부 경로 접근은 허용되지 않음")
         return candidate

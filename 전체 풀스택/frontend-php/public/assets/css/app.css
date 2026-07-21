@@ -1,3 +1,10 @@
+.auth-gate{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;background:rgba(5,9,17,.88);backdrop-filter:blur(18px)}
+.auth-gate[hidden]{display:none}
+.auth-card{width:min(430px,100%);display:grid;gap:18px;padding:34px;border:1px solid rgba(255,255,255,.13);border-radius:24px;background:#111927;box-shadow:0 28px 80px rgba(0,0,0,.45)}
+.auth-card h1{margin:4px 0 0;font-size:28px}.auth-card p{margin:0;color:#9aa9bd;line-height:1.6}.auth-card label{display:grid;gap:8px;color:#dbe5f2;font-size:13px;font-weight:700}
+.auth-card input{width:100%;padding:13px 14px;border:1px solid #334154;border-radius:11px;background:#0a111c;color:#fff;font:inherit}.auth-card input:focus{outline:2px solid #35d4b5;border-color:transparent}
+.auth-card .primary-btn{min-height:46px}.auth-error{min-height:20px!important;color:#ff8e9a!important}.topbar-actions{display:flex;align-items:center;gap:10px}.topbar-actions>span{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9fb0c5;font-size:13px}
+
 :root {
   color-scheme: dark;
   --bg: #06101d;

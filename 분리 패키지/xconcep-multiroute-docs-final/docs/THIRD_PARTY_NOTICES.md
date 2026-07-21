@@ -12,9 +12,11 @@
 
 오픈소스 프로젝트이나 실제 모델·CUDA·NCCL·Driver 조합의 호환성을 확인해야 함.
 
-## Hunyuan3D
+## TripoSR
 
-코드·가중치 배포 라이선스와 상업 서비스·지역·재배포 조건을 법무 검토해야 함. 모델 가중치는 포함하지 않음.
+VAST-AI-Research/TripoSR 코드와 stabilityai/TripoSR 모델은 MIT 라이선스임. 모델 가중치는 저장소에 포함하지 않고 최초 실행 시 Hugging Face에서 내려받음.
+
+Hunyuan3D 2.0/2.1은 라이선스상 대한민국이 허용 지역에 포함되지 않아 현재 운영 스택에서 제외함.
 
 ## OpenUSD
 

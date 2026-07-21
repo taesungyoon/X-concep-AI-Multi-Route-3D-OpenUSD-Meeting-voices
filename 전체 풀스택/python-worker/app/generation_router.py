@@ -62,10 +62,13 @@ def plan_generation(
     if motion:
         reasons.append("동작·OpenUSD·Omniverse 출력이 필요함")
 
+    force_blender = engine_override == "blender"
     if engine_override:
-        route = engine_override
+        # Blender is a post-processor, not a source geometry generator. Build a
+        # deterministic source mesh first so the UI's direct Blender option is runnable.
+        route = ("openscad" if structural else "hunyuan3d") if force_blender else engine_override
         confidence = 1.0
-        reasons.insert(0, "고급 설정에서 생성 엔진을 직접 지정함")
+        reasons.insert(0, "Blender용 기초 형상을 먼저 생성한 뒤 후처리함" if force_blender else "고급 설정에서 생성 엔진을 직접 지정함")
     elif output_goal == "fast":
         route = "hunyuan3d"
         confidence = 0.95
@@ -98,7 +101,7 @@ def plan_generation(
             reasons.append("명확한 구조 단서가 적어 빠른 Mesh Preview를 우선함")
 
     postprocess: list[str] = []
-    if output_goal in {"high_quality", "motion_openusd"} or quality_profile == "final" or route == "hybrid":
+    if force_blender or output_goal in {"high_quality", "motion_openusd"} or quality_profile == "final" or route == "hybrid":
         postprocess.append("blender")
     if output_goal == "motion_openusd":
         postprocess.append("openusd")

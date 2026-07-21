@@ -1,5 +1,6 @@
 from pathlib import Path
 import os, secrets
+from PIL import Image, UnidentifiedImageError
 from django.conf import settings
 from django.db import transaction
 from .models import Project, Asset, Concept2D, MeetingSession, TranscriptSegment, GenerationJob
@@ -7,6 +8,10 @@ from .clients import agent_client, knowledge_client
 
 ALLOWED_IMAGE_MIMES={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}
 ALLOWED_AUDIO_EXTS={'webm','wav','mp3','m4a','ogg','flac'}
+ALLOWED_AUDIO_MIMES={
+    'audio/webm','audio/wav','audio/x-wav','audio/mpeg','audio/mp4',
+    'audio/ogg','audio/flac','application/ogg','video/webm',
+}
 
 def public_url(relative: str) -> str: return '/storage/' + relative.replace(os.sep,'/')
 def project_dir(project_id: str) -> Path:
@@ -19,10 +24,24 @@ def new_project(prompt='', category='equipment', meeting=False, output_goal='aut
     return p
 
 def save_images(project, files):
-    saved=[]; folder=project_dir(project.id)/'uploads'; folder.mkdir(parents=True,exist_ok=True)
+    saved=[]
     for i,f in enumerate(files[:4]):
+        if getattr(f,'size',0) > settings.MAX_IMAGE_UPLOAD_BYTES:
+            raise ValueError(f'이미지는 장당 {settings.MAX_IMAGE_UPLOAD_BYTES // (1024*1024)}MB 이하여야 함')
         ext=ALLOWED_IMAGE_MIMES.get(getattr(f,'content_type',''))
-        if not ext: continue
+        if not ext: raise ValueError('JPG, PNG, WEBP 이미지만 업로드할 수 있음')
+        try:
+            f.seek(0)
+            image=Image.open(f)
+            image.verify()
+            actual=(image.format or '').lower()
+            if actual not in {'jpeg','png','webp'}:
+                raise ValueError('지원하지 않는 이미지 형식임')
+        except (UnidentifiedImageError, OSError) as exc:
+            raise ValueError('손상되었거나 이미지가 아닌 파일임') from exc
+        finally:
+            f.seek(0)
+        folder=project_dir(project.id)/'uploads'; folder.mkdir(parents=True,exist_ok=True)
         name=f'source-{i+1:02d}-{secrets.token_hex(3)}.{ext}'; dest=folder/name
         with dest.open('wb') as out:
             for chunk in f.chunks(): out.write(chunk)
@@ -34,15 +53,23 @@ def save_images(project, files):
 def create_job(project, job_type, payload):
     return GenerationJob.objects.create(project=project,job_type=job_type,status='running',progress=10,payload=payload)
 
+def create_queued_job(project, job_type, payload):
+    return GenerationJob.objects.create(project=project,job_type=job_type,status='queued',progress=0,payload=payload)
+
+def start_existing_job(job):
+    job.status='running'; job.progress=10; job.error=''
+    job.save(update_fields=['status','progress','error','updated_at'])
+    return job
+
 def complete_job(job,result):
     job.status='completed'; job.progress=100; job.result=result; job.save(update_fields=['status','progress','result','updated_at'])
 def fail_job(job,exc):
     job.status='failed'; job.error=str(exc); job.save(update_fields=['status','error','updated_at'])
 
-def generate_2d(project, image_assets=None, meeting_analysis=None):
+def generate_2d(project, image_assets=None, meeting_analysis=None, job=None):
     image_assets=image_assets if image_assets is not None else list(project.assets.filter(kind='source_image'))
     payload={'project_id':project.id,'prompt':project.prompt,'category':project.category,'image_paths':[a.relative_path for a in image_assets],'meeting_analysis':meeting_analysis}
-    job=create_job(project,'generate_2d',payload)
+    job=start_existing_job(job) if job else create_job(project,'generate_2d',payload)
     project.status='generating_2d'; project.progress=25; project.step='compare'; project.save()
     try:
         result=agent_client.post('/v1/workflows/generate-2d',payload,1800)
@@ -55,11 +82,13 @@ def generate_2d(project, image_assets=None, meeting_analysis=None):
                 rel_path = str(item.get('path') or item.get('absolute_path') or '').lstrip('/')
             Concept2D.objects.create(project=project,concept_id=item.get('id',''),title=item.get('title',''),description=item.get('description',''),public_url=item.get('url',''),relative_path=rel_path,metadata={k:v for k,v in item.items() if k not in {'id','title','description','url','absolute_path','path'}})
         project.analysis=result.get('analysis'); project.pipeline=result.get('pipeline'); project.status='2d_ready'; project.progress=100; project.save()
+        if meeting_analysis is not None:
+            project.meeting.status='2d_ready'; project.meeting.save(update_fields=['status','updated_at'])
         complete_job(job,result); return result
     except Exception as exc:
         project.status='failed'; project.save(update_fields=['status','updated_at']); fail_job(job,exc); raise
 
-def generate_3d(project, selected, output_goal=None, quality_profile=None, engine_override=None):
+def generate_3d(project, selected, output_goal=None, quality_profile=None, engine_override=None, job=None):
     output_goal=(output_goal or project.output_goal or 'auto').strip()
     quality_profile=(quality_profile or project.quality_profile or 'standard').strip()
     if output_goal not in {'auto','fast','structural','high_quality','motion_openusd'}:
@@ -80,7 +109,7 @@ def generate_3d(project, selected, output_goal=None, quality_profile=None, engin
         'engine_override':engine_override or None,
         'previous_design_state':project.design_state,
     }
-    job=create_job(project,'generate_3d',payload)
+    job=start_existing_job(job) if job else create_job(project,'generate_3d',payload)
     project.status='generating_3d'; project.progress=35; project.step='result'; project.selected_2d_id=selected.concept_id
     project.output_goal=output_goal; project.quality_profile=quality_profile
     project.save()
@@ -143,7 +172,12 @@ def apply_review_grade(project, requested_grade, reviewer, note=''):
 
 def save_audio_chunk(project, file, chunk_index):
     ext=Path(file.name).suffix.lower().lstrip('.') or 'webm'
-    if ext not in ALLOWED_AUDIO_EXTS: ext='webm'
+    if ext not in ALLOWED_AUDIO_EXTS:
+        raise ValueError('지원하지 않는 음성 파일 확장자임')
+    if getattr(file,'content_type','') not in ALLOWED_AUDIO_MIMES:
+        raise ValueError('지원하지 않는 음성 파일 형식임')
+    if getattr(file,'size',0) > settings.MAX_AUDIO_UPLOAD_BYTES:
+        raise ValueError(f'음성 파일은 {settings.MAX_AUDIO_UPLOAD_BYTES // (1024*1024)}MB 이하여야 함')
     folder=project_dir(project.id)/'meeting'/'audio'; folder.mkdir(parents=True,exist_ok=True)
     dest=folder/f'chunk-{chunk_index:04d}-{secrets.token_hex(3)}.{ext}'
     with dest.open('wb') as out:

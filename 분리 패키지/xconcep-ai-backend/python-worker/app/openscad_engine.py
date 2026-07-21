@@ -4,6 +4,7 @@ import json
 import math
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -49,7 +50,9 @@ def _dimensions(design_state: dict[str, Any], category: str) -> tuple[float, flo
 
 def _geometry_contract(design_state: dict[str, Any], category: str) -> dict[str, Any]:
     width, depth, height = _dimensions(design_state, category)
-    thickness = max(8.0, min(width, depth) * 0.025)
+    smallest = min(width, depth, height)
+    thickness = max(0.5, smallest * 0.025)
+    profile = max(1.0, smallest * 0.035)
     components = design_state.get("components", [])
     return {
         "schema_version": "1.0",
@@ -57,8 +60,8 @@ def _geometry_contract(design_state: dict[str, Any], category: str) -> dict[str,
         "overall": {"width": width, "depth": depth, "height": height},
         "parameters": {
             "plate_thickness": thickness,
-            "frame_profile": max(20.0, min(width, depth) * 0.035),
-            "hole_diameter": max(4.0, min(width, depth) * 0.012),
+            "frame_profile": profile,
+            "hole_diameter": max(0.5, min(width, depth) * 0.012),
         },
         "components": components,
         "features": ["base", "supports", "work_unit", "mounting_holes"],
@@ -74,19 +77,26 @@ def _write_scad(path: Path, contract: dict[str, Any], category: str) -> None:
         body = f"""
 $fn=64;
 W={width}; D={depth}; H={height}; T={t}; HD={hole};
+module rib(y) {{
+  hull() {{
+    translate([-W/2+T,y,T+T/2]) cube([T,D*0.12,T], center=true);
+    translate([-W/2+T,y,H*0.62]) cube([T,D*0.12,T], center=true);
+    translate([W*0.25,y,T+T/2]) cube([T,D*0.12,T], center=true);
+  }}
+}}
 difference() {{
   union() {{
-    cube([W,D,T], center=true);
-    translate([0,0,H/2]) cube([T,D,H], center=true);
-    translate([-W*0.25,0,H*0.25]) rotate([0,35,0]) cube([T,D*0.75,H*0.6], center=true);
-    translate([ W*0.25,0,H*0.25]) rotate([0,-35,0]) cube([T,D*0.75,H*0.6], center=true);
+    translate([0,0,T/2]) cube([W,D,T], center=true);
+    translate([-W/2+T/2,0,H/2]) cube([T,D,H], center=true);
+    rib(-D*0.30); rib(D*0.30);
   }}
   for (x=[-W*0.35,W*0.35], y=[-D*0.3,D*0.3]) translate([x,y,-T]) cylinder(h=T*3,d=HD);
 }}
 """
     else:
         base_z = t / 2
-        post_z = t + height / 2
+        post_height = height - t
+        post_z = t + post_height / 2
         x = width / 2 - profile / 2
         y = depth / 2 - profile / 2
         work_w, work_d, work_h = width * 0.36, depth * 0.42, height * 0.28
@@ -99,14 +109,14 @@ module base_plate() {{
     for (x=[-W*0.42,W*0.42], y=[-D*0.42,D*0.42]) translate([x,y,-T]) cylinder(h=T*3,d=HD);
   }}
 }}
-module post(x,y) {{ translate([x,y,{post_z}]) cube([P,P,H], center=true); }}
+module post(x,y) {{ translate([x,y,{post_z}]) cube([P,P,{post_height}], center=true); }}
 module frame() {{
   base_plate();
   post(-{x},-{y}); post({x},-{y}); post(-{x},{y}); post({x},{y});
-  translate([0,-{y},H+T]) cube([W,P,P], center=true);
-  translate([0,{y},H+T]) cube([W,P,P], center=true);
-  translate([-{x},0,H+T]) cube([P,D,P], center=true);
-  translate([{x},0,H+T]) cube([P,D,P], center=true);
+  translate([0,-{y},H-P/2]) cube([W,P,P], center=true);
+  translate([0,{y},H-P/2]) cube([W,P,P], center=true);
+  translate([-{x},0,H-P/2]) cube([P,D,P], center=true);
+  translate([{x},0,H-P/2]) cube([P,D,P], center=true);
 }}
 module work_unit() {{ translate([0,0,T+H*0.42]) cube([{work_w},{work_d},{work_h}], center=true); }}
 module control_box() {{ translate([W*0.42,0,T+H*0.35]) cube([W*0.16,D*0.28,H*0.45], center=true); }}
@@ -127,18 +137,18 @@ def _parts_from_contract(contract: dict[str, Any], category: str) -> list[Part]:
     if category == "part":
         return [
             Part("base", (width, depth, plate), (0, 0, plate / 2), steel),
-            Part("upright", (plate, depth, height), (0, 0, height / 2 + plate), blue),
-            Part("rib_left", (plate, depth * .72, height * .62), (-width * .25, 0, height * .32), dark),
-            Part("rib_right", (plate, depth * .72, height * .62), (width * .25, 0, height * .32), dark),
+            Part("upright", (plate, depth, height), (-width / 2 + plate / 2, 0, height / 2), blue),
+            Part("rib_left", (width * .48, depth * .12, height * .30), (-width * .24, -depth * .30, height * .18), dark),
+            Part("rib_right", (width * .48, depth * .12, height * .30), (-width * .24, depth * .30, height * .18), dark),
         ]
     x, y = width / 2 - profile / 2, depth / 2 - profile / 2
     parts = [Part("base", (width, depth, plate), (0, 0, plate / 2), steel)]
     for px in (-x, x):
         for py in (-y, y):
-            parts.append(Part("post", (profile, profile, height), (px, py, height / 2 + plate), blue))
+            parts.append(Part("post", (profile, profile, height - plate), (px, py, (height + plate) / 2), blue))
     parts.extend([
-        Part("top_front", (width, profile, profile), (0, -y, height + plate), steel),
-        Part("top_back", (width, profile, profile), (0, y, height + plate), steel),
+        Part("top_front", (width, profile, profile), (0, -y, height - profile / 2), steel),
+        Part("top_back", (width, profile, profile), (0, y, height - profile / 2), steel),
         Part("work_unit", (width * .36, depth * .42, height * .28), (0, 0, height * .42), blue),
         Part("control_box", (width * .16, depth * .28, height * .45), (width * .42, 0, height * .35), steel),
     ])
@@ -162,6 +172,8 @@ def _stl_to_glb(stl_path: Path, glb_path: Path) -> None:
     mesh = trimesh.load(stl_path, force="mesh")
     if not isinstance(mesh, trimesh.Trimesh):
         raise RuntimeError("OpenSCAD STL을 메시로 읽지 못함")
+    # OpenSCAD's STL coordinates are millimetres while glTF/GLB uses metres.
+    mesh.apply_scale(0.001)
     mesh.visual.face_colors = np.array((74, 116, 142, 255), dtype=np.uint8)
     scene = trimesh.Scene(mesh)
     glb_path.write_bytes(scene.export(file_type="glb"))
@@ -187,18 +199,30 @@ def generate_openscad(
     manifest_path = output_dir / "assembly_manifest.json"
     _write_scad(scad_path, contract, category)
 
-    binary = shutil.which(openscad_bin)
+    binary = shutil.which(openscad_bin) or (str(Path(openscad_bin).resolve()) if Path(openscad_bin).is_file() else None)
     provider: dict[str, Any]
+    if mode == "native" and not binary:
+        raise RuntimeError(f"OpenSCAD native binary not found: {openscad_bin}")
     if mode != "mock" and binary:
         command = [binary, "--export-format", "stl", "-o", str(stl_path), str(scad_path)]
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds, check=False)
+        started = time.perf_counter()
+        completed = subprocess.run(
+            command, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=timeout_seconds, check=False,
+        )
+        elapsed = round(time.perf_counter() - started, 3)
         if completed.returncode != 0 or not stl_path.exists():
+            if mode == "native":
+                raise RuntimeError(f"OpenSCAD native generation failed: {completed.stderr[-1200:]}")
             provider = {"mode": "fallback", "engine": "openscad", "error": completed.stderr[-1200:]}
             parts = _parts_from_contract(contract, category)
             _export_fallback_mesh(parts, glb_path, stl_path)
         else:
             _stl_to_glb(stl_path, glb_path)
-            provider = {"mode": "native", "engine": "openscad", "binary": binary, "command": command}
+            provider = {
+                "mode": "native", "engine": "openscad", "binary": binary, "command": command,
+                "returncode": completed.returncode, "duration_seconds": elapsed,
+            }
     else:
         parts = _parts_from_contract(contract, category)
         _export_fallback_mesh(parts, glb_path, stl_path)

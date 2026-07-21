@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -54,8 +55,6 @@ def _write_blender_script(
     profile: str,
 ) -> None:
     sources = json.dumps([str(path) for path in source_glbs])
-    samples = {"preview": 16, "standard": 64, "final": 256}[profile]
-    engine = "BLENDER_EEVEE_NEXT" if profile != "final" else "BLENDER_EEVEE_NEXT"
     script = f'''import bpy, math
 from mathutils import Vector
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -65,16 +64,17 @@ for source in sources:
 objects=[o for o in bpy.context.scene.objects if o.type=="MESH"]
 if not objects: raise RuntimeError("GLB 메시 없음")
 for idx,obj in enumerate(objects):
-    for poly in obj.data.polygons: poly.use_smooth=True
-    if not obj.data.materials:
-        mat=bpy.data.materials.new(name=f"XconcepMaterial_{{idx}}")
-        mat.use_nodes=True
-        bsdf=mat.node_tree.nodes.get("Principled BSDF")
-        palette=[(0.04,0.24,0.68,1),(0.025,0.03,0.04,1),(0.42,0.45,0.47,1)]
-        bsdf.inputs["Base Color"].default_value=palette[idx%len(palette)]
-        bsdf.inputs["Metallic"].default_value=0.35 if idx%3==2 else 0.12
-        bsdf.inputs["Roughness"].default_value=0.28 if idx%3==0 else 0.38
-        obj.data.materials.append(mat)
+    for poly in obj.data.polygons: poly.use_smooth=False
+    mat=bpy.data.materials.new(name=f"XconcepMaterial_{{idx}}")
+    mat.use_nodes=True
+    bsdf=mat.node_tree.nodes.get("Principled BSDF")
+    palette=[(0.04,0.24,0.68,1),(0.025,0.03,0.04,1),(0.42,0.45,0.47,1)]
+    bsdf.inputs["Base Color"].default_value=palette[idx%len(palette)]
+    bsdf.inputs["Metallic"].default_value=0.62 if idx%3==2 else 0.22
+    bsdf.inputs["Roughness"].default_value=0.24 if idx%3==0 else 0.34
+    obj.data.materials.clear(); obj.data.materials.append(mat)
+    bevel=obj.modifiers.new(name="Manufacturing Edge",type='BEVEL')
+    bevel.width=max(min(obj.dimensions)*0.008,0.00025); bevel.segments=3; bevel.limit_method='ANGLE'
 mins=Vector((1e9,1e9,1e9)); maxs=Vector((-1e9,-1e9,-1e9))
 for obj in objects:
     for corner in obj.bound_box:
@@ -95,17 +95,23 @@ for loc,energy,area,temp in [((3,-4,5),1700,3.5,0),((-3,-1,2.5),900,2.8,0),((0,4
     bpy.ops.object.light_add(type='AREA',location=(center.x+loc[0]*size/4,center.y+loc[1]*size/4,center.z+loc[2]*size/4))
     light=bpy.context.object; light.data.energy=energy; light.data.shape='DISK'; light.data.size=max(area*size/4,.2); look_at(light,center)
 scene=bpy.context.scene
-scene.render.engine='{engine}'
+try:
+    scene.render.engine='BLENDER_EEVEE_NEXT'
+except TypeError:
+    scene.render.engine='BLENDER_EEVEE'
 scene.render.resolution_x=1280; scene.render.resolution_y=860; scene.render.resolution_percentage=100
 scene.render.image_settings.file_format='PNG'; scene.render.filepath={str(output_png)!r}
+if scene.world is None: scene.world=bpy.data.worlds.new("Xconcep World")
 scene.world.color=(0.01,0.015,0.025)
 scene.render.film_transparent=False
 scene.render.image_settings.color_mode='RGBA'
-scene.render.engine='{engine}'
 bpy.ops.wm.save_as_mainfile(filepath={str(output_glb.with_suffix('.blend'))!r})
-bpy.ops.export_scene.gltf(filepath={str(output_glb)!r},export_format='GLB',export_apply=True)
+bpy.ops.object.select_all(action='DESELECT')
+for obj in objects: obj.select_set(True)
+bpy.context.view_layer.objects.active=objects[0]
+bpy.ops.export_scene.gltf(filepath={str(output_glb)!r},export_format='GLB',export_apply=True,use_selection=True)
 try:
-    bpy.ops.wm.usd_export(filepath={str(output_usd)!r},export_materials=True,export_textures=True)
+    bpy.ops.wm.usd_export(filepath={str(output_usd)!r},export_materials=True,export_textures=True,selected_objects_only=True)
 except Exception as exc:
     print("USD_EXPORT_WARNING",exc)
 bpy.ops.render.render(write_still=True)
@@ -130,23 +136,35 @@ def generate_blender_asset(
     output_usd = output_dir / "model_blender.usdc"
     script_path = output_dir / "blender_scene.py"
     materials_path = output_dir / "material_manifest.json"
-    binary = shutil.which(blender_bin)
+    binary = shutil.which(blender_bin) or (str(Path(blender_bin).resolve()) if Path(blender_bin).is_file() else None)
     provider: dict[str, Any]
+    if mode == "native" and not binary:
+        raise RuntimeError(f"Blender native binary not found: {blender_bin}")
     if mode != "mock" and binary:
         _write_blender_script(script_path, source_glbs, output_glb, output_png, output_usd, profile)
+        started = time.perf_counter()
         completed = subprocess.run(
             [binary, "--background", "--python", str(script_path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout_seconds,
             check=False,
         )
-        if completed.returncode != 0 or not output_glb.exists():
+        elapsed = round(time.perf_counter() - started, 3)
+        if completed.returncode != 0 or not output_glb.exists() or not output_png.exists():
+            if mode == "native":
+                details = (completed.stderr or completed.stdout)[-2400:]
+                raise RuntimeError(f"Blender native generation failed: {details}")
             _merge_glbs(source_glbs, output_glb)
             create_preview(output_glb, selected_image_path, output_png, "")
             provider = {"mode": "fallback", "engine": "blender", "error": completed.stderr[-1600:]}
         else:
-            provider = {"mode": "native", "engine": "blender", "binary": binary, "profile": profile}
+            provider = {
+                "mode": "native", "engine": "blender", "binary": binary, "profile": profile,
+                "returncode": completed.returncode, "duration_seconds": elapsed,
+            }
     else:
         _merge_glbs(source_glbs, output_glb)
         create_preview(output_glb, selected_image_path, output_png, "")

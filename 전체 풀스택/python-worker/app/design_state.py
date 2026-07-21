@@ -53,6 +53,30 @@ def _normalize_dimensions(source: dict[str, Any] | None) -> dict[str, float | No
     return result
 
 
+def _extract_prompt_dimensions(prompt: str) -> dict[str, float | None]:
+    """Extract deterministic labelled dimensions when an LLM omits them."""
+    aliases = {
+        "width_mm": r"(?:폭|가로|width|wide)",
+        "depth_mm": r"(?:깊이|세로|depth|deep)",
+        "height_mm": r"(?:높이|height|high)",
+        "length_mm": r"(?:길이|length|long)",
+    }
+    result: dict[str, float | None] = {key: None for key in aliases}
+    for key, label in aliases.items():
+        match = re.search(
+            rf"{label}\s*(?:은|는|을|를|:|=)?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(mm|cm|m|밀리미터|센티미터|미터)?",
+            prompt,
+            re.IGNORECASE,
+        )
+        if not match:
+            continue
+        value = float(match.group(1).replace(",", ""))
+        unit = (match.group(2) or "mm").lower()
+        multiplier = 1000.0 if unit in {"m", "미터"} else 10.0 if unit in {"cm", "센티미터"} else 1.0
+        result[key] = value * multiplier
+    return result
+
+
 def _normalize_components(source: dict[str, Any] | None, category: str) -> list[dict[str, Any]]:
     source = source or {}
     raw = source.get("main_components") or source.get("components") or []
@@ -126,6 +150,10 @@ def build_design_state(
                 merged[key] = value
 
     dimensions = _normalize_dimensions(merged)
+    prompt_dimensions = _extract_prompt_dimensions(prompt)
+    for key, value in prompt_dimensions.items():
+        if dimensions.get(key) is None and value is not None:
+            dimensions[key] = value
     components = _normalize_components(merged, category)
     purpose = str(
         merged.get("functional_purpose")

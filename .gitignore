@@ -1,0 +1,26 @@
+.venv/
+.omniverse-venv/
+.omniverse-runtime/
+.triposr-src/
+.triposr-venv/
+.triposr-runtime/
+.native-tools/
+.cache/
+optix7cache.db*
+**/__pycache__/
+**/.pytest_cache/
+*.py[cod]
+*.sqlite3
+**/node_modules/
+**/dist/
+전체 풀스택/python-worker/tests/tmp_storage/
+**/python-worker/tests/tmp_storage/
+전체 풀스택/frontend-php/public/storage/
+전체 풀스택/.env
+분리 패키지/*/.env
+전체 풀스택/storage/quality-datasets/
+전체 풀스택/storage/quality-program/
+전체 풀스택/storage/quality-results/
+분리 패키지/*/storage/quality-datasets/
+분리 패키지/*/storage/quality-program/
+분리 패키지/*/storage/quality-results/

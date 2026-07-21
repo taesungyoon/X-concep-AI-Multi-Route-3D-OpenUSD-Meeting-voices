@@ -27,6 +27,10 @@ def test_storage_path_traversal_is_blocked(monkeypatch, tmp_path):
         pipeline._resolve_path("../../etc/passwd")
     with pytest.raises(ValueError, match="STORAGE_PATH"):
         pipeline._resolve_path("/etc/passwd")
+    with pytest.raises(ValueError, match="STORAGE_PATH"):
+        pipeline._resolve_path(r"C:\Windows\System32\drivers\etc\hosts")
+    with pytest.raises(ValueError, match="STORAGE_PATH"):
+        pipeline._resolve_path(r"\\server\share\asset.glb")
 
 
 def test_openusd_text_binary_and_layered_stages_parse(monkeypatch, tmp_path):

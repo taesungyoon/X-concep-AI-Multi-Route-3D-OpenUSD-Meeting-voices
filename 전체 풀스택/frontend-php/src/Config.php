@@ -10,7 +10,12 @@ final class Config
 
     public static function maxUploadBytes(): int
     {
-        $mb = max(1, (int)(getenv('MAX_UPLOAD_MB') ?: 30));
+        $mb = max(1, (int)(getenv('MAX_UPLOAD_MB') ?: 128));
         return $mb * 1024 * 1024;
+    }
+
+    public static function controlPlaneToken(): string
+    {
+        return trim((string)(getenv('CONTROL_PLANE_TOKEN') ?: ''));
     }
 }

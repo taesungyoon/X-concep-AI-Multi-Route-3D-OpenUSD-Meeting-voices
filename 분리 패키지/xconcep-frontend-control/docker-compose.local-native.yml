@@ -1,0 +1,22 @@
+services:
+  python-worker:
+    build:
+      args:
+        INSTALL_OPENSCAD: "true"
+        INSTALL_SPEECH: "true"
+    environment:
+      PIPELINE_MODE: local
+      LLM_MODE: openai_compatible
+      VLLM_BASE_URL: http://host.docker.internal:11434/v1
+      VLLM_API_KEY: ollama
+      GEMMA_MODEL_NAME: ${OLLAMA_MODEL:-qwen3:14b}
+      OPENSCAD_MODE: auto
+      OPENAI_IMAGE_MODE: ${OPENAI_IMAGE_MODE:-comfyui}
+      COMFYUI_BASE_URL: http://host.docker.internal:8188
+      SHAPE_MODE: mock
+      SHAPE_PROVIDER: triposr
+      SPEECH_MODE: faster_whisper
+      WHISPER_MODEL: ${WHISPER_MODEL:-large-v3-turbo}
+      WHISPER_MODEL_CACHE: /app/storage/models/whisper
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-auto}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-auto}

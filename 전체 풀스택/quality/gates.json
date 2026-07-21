@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "tiers": {
+    "smoke": {
+      "phase_minimum_score_pct": {"1": 90, "2": 100, "3": 100, "4": 100, "6": 100},
+      "phase1_critical_checks": ["secrets_ignored", "mysql_loopback_only", "openai_key_empty_by_default"],
+      "image_results_required": false,
+      "semantic_score_required": false,
+      "image_min_result_count": 0,
+      "semantic_min_result_count": 0,
+      "native_cad_benchmark_required": false,
+      "cad_public_data_required": false,
+      "pxr_required": false,
+      "usdchecker_required": false
+    },
+    "standard": {
+      "phase_minimum_score_pct": {"1": 100, "2": 100, "3": 100, "4": 100, "6": 100},
+      "phase1_critical_checks": ["secrets_ignored", "mysql_loopback_only", "openai_key_empty_by_default"],
+      "image_results_required": true,
+      "semantic_score_required": false,
+      "image_min_result_count": 12,
+      "semantic_min_result_count": 0,
+      "native_cad_benchmark_required": true,
+      "cad_public_data_required": false,
+      "pxr_required": true,
+      "usdchecker_required": true
+    },
+    "full": {
+      "phase_minimum_score_pct": {"1": 100, "2": 100, "3": 100, "4": 100, "6": 100},
+      "phase1_critical_checks": ["secrets_ignored", "mysql_loopback_only", "openai_key_empty_by_default"],
+      "image_results_required": true,
+      "semantic_score_required": true,
+      "image_min_result_count": 60,
+      "semantic_min_result_count": 30,
+      "native_cad_benchmark_required": true,
+      "cad_public_data_required": true,
+      "pxr_required": true,
+      "usdchecker_required": true
+    }
+  },
+  "thresholds": {
+    "parti_min_categories": 10,
+    "parti_min_challenges": 8,
+    "geneval_required_tags": ["single_object", "two_object", "counting", "colors", "position", "color_attr"],
+    "image_min_width": 512,
+    "image_min_height": 512,
+    "image_min_bytes": 10000,
+    "image_min_entropy": 3.0,
+    "image_basic_pass_rate_pct": 95.0,
+    "image_max_exact_duplicate_rate_pct": 2.0,
+    "image_semantic_score_pct": 95.0,
+    "native_cad_acceptance_rate_pct": 95.0,
+    "public_cad_acceptance_rate_pct": 100.0,
+    "usd_stage_open_rate_pct": 100.0
+  },
+  "semantic_evaluator": {
+    "toolchain_id": "grounding-dino-geneval-evaluator",
+    "evaluator": "grounding-dino-geneval-compatible-v1",
+    "official_geneval_score": false,
+    "detection_threshold": 0.30,
+    "nms_iou_threshold": 0.30,
+    "text_threshold": 0.30
+  }
+}

@@ -3,20 +3,85 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from django.conf import settings
+from django.db import connections
 from .models import Project, GenerationJob
 from .serializers import ProjectSerializer, JobSerializer
 from .clients import agent_client, knowledge_client
 from . import services
+from .tasks import generate_2d_task, generate_3d_task
+from .corporate_auth import (
+    CorporateAuthenticationError,
+    authenticate_corporate_user,
+    issue_token,
+    probe_corporate_database,
+)
 
 def project_data(p): return ProjectSerializer(p).data
 
+def queued_response(project, job):
+    return Response({'project':project_data(project),'job':JobSerializer(job).data},status=202)
+
+def queue_2d(project, assets, meeting_analysis=None):
+    payload={'asset_ids':[a.pk for a in assets],'meeting_analysis':meeting_analysis}
+    job=services.create_queued_job(project,'generate_2d',payload)
+    project.status='queued_2d'; project.progress=0; project.step='compare'; project.save()
+    try: generate_2d_task.delay(str(job.id),payload['asset_ids'],meeting_analysis)
+    except Exception as exc:
+        services.fail_job(job,exc); project.status='failed'; project.save(update_fields=['status','updated_at']); raise
+    return job
+
 @api_view(['GET'])
 def health(request):
-    return Response({'status':'ok','service':'drf-control-plane','database':'connected'})
+    with connections['default'].cursor() as cursor:
+        cursor.execute('SELECT 1')
+        database_ok = cursor.fetchone() == (1,)
+    return Response({'status':'ok','service':'drf-control-plane','database':'connected' if database_ok else 'degraded'})
+
+
+@api_view(['GET'])
+def auth_config(request):
+    return Response({
+        'mode': settings.AUTH_MODE,
+        'required': settings.AUTH_MODE in settings.AUTH_REQUIRED_MODES,
+        'token_ttl_seconds': settings.AUTH_TOKEN_TTL_SECONDS,
+    })
+
+
+@api_view(['POST'])
+def auth_login(request):
+    if settings.AUTH_MODE not in settings.AUTH_REQUIRED_MODES:
+        return Response({'error':'DB 인증이 활성화되지 않음'}, status=409)
+    try:
+        user = authenticate_corporate_user(
+            str(request.data.get('username') or ''),
+            str(request.data.get('password') or ''),
+        )
+    except CorporateAuthenticationError:
+        return Response({'error':'아이디 또는 비밀번호가 올바르지 않음'}, status=401)
+    return Response({
+        'token': issue_token(user),
+        'token_type': 'Bearer',
+        'expires_in': settings.AUTH_TOKEN_TTL_SECONDS,
+        'user': user.public(),
+    })
+
+
+@api_view(['GET'])
+def auth_me(request):
+    user = getattr(request, 'corporate_user', None)
+    if user is None:
+        return Response({'authenticated': False}, status=401)
+    return Response({'authenticated': True, 'user': user.public()})
 
 @api_view(['GET'])
 def system_status(request):
-    out={'control_plane':'ok'}
+    auth_status = {'mode': settings.AUTH_MODE, 'required': settings.AUTH_MODE in settings.AUTH_REQUIRED_MODES}
+    if settings.AUTH_MODE in settings.AUTH_REQUIRED_MODES:
+        try: auth_status['database_connected'] = probe_corporate_database()
+        except Exception as exc:
+            auth_status.update({'database_connected': False, 'error': type(exc).__name__})
+    out={'control_plane':'ok', 'authentication': auth_status}
     try:
         agent=agent_client.health()
         out.update(agent.get('worker') or {})
@@ -47,7 +112,12 @@ def projects(request):
     if quality_profile not in {'preview','standard','final'}: return Response({'error':'지원하지 않는 품질 프로필임'},status=422)
     p=services.new_project(prompt,category,output_goal=output_goal,quality_profile=quality_profile)
     files=request.FILES.getlist('images[]') or request.FILES.getlist('images')
-    assets=services.save_images(p,files)
+    try: assets=services.save_images(p,files)
+    except ValueError as exc:
+        p.delete(); return Response({'error':str(exc)},status=422)
+    if not settings.SYNC_PIPELINE:
+        try: return queued_response(p,queue_2d(p,assets))
+        except Exception as exc: return Response({'error':f'작업 큐 등록 실패: {exc}'},status=503)
     try: services.generate_2d(p,assets)
     except Exception as exc: return Response({'error':str(exc)},status=502)
     return Response({'project':project_data(p)},status=201)
@@ -70,6 +140,15 @@ def project_generate_3d(request,project_id):
     output_goal=(request.data.get('output_goal') or p.output_goal or 'auto').strip()
     quality_profile=(request.data.get('quality_profile') or p.quality_profile or 'standard').strip()
     engine_override=(request.data.get('engine_override') or '').strip() or None
+    if not settings.SYNC_PIPELINE:
+        payload={'concept_pk':selected.pk,'output_goal':output_goal,'quality_profile':quality_profile,'engine_override':engine_override}
+        job=services.create_queued_job(p,'generate_3d',payload)
+        p.status='queued_3d'; p.progress=0; p.step='result'; p.save()
+        try: generate_3d_task.delay(str(job.id),selected.pk,output_goal,quality_profile,engine_override)
+        except Exception as exc:
+            services.fail_job(job,exc); p.status='failed'; p.save(update_fields=['status','updated_at'])
+            return Response({'error':f'작업 큐 등록 실패: {exc}'},status=503)
+        return queued_response(p,job)
     try: services.generate_3d(p,selected,output_goal,quality_profile,engine_override)
     except Exception as exc: return Response({'error':str(exc)},status=502)
     return Response({'project':project_data(p)})
@@ -79,7 +158,11 @@ def project_generate_3d(request,project_id):
 def meeting_chunk(request,project_id):
     p=get_object_or_404(Project,pk=project_id); f=request.FILES.get('audio')
     if not f: return Response({'error':'회의 음성 파일이 없음'},status=422)
-    idx=int(request.data.get('chunk_index',p.meeting.chunk_count)); rel=services.save_audio_chunk(p,f,idx)
+    try:
+        idx=int(request.data.get('chunk_index',p.meeting.chunk_count))
+        if idx < 0 or idx > 999999: raise ValueError('음성 청크 번호가 범위를 벗어남')
+        rel=services.save_audio_chunk(p,f,idx)
+    except (TypeError,ValueError) as exc: return Response({'error':str(exc)},status=422)
     try: result=services.transcribe_chunk(p,rel,idx)
     except Exception as exc: return Response({'error':str(exc)},status=502)
     return Response({'project':project_data(p),'chunk':result})
@@ -96,6 +179,9 @@ def meeting_analyze(request,project_id):
 def meeting_generate_2d(request,project_id):
     p=get_object_or_404(Project,pk=project_id)
     if not p.meeting.analysis: return Response({'error':'회의 분석을 먼저 수행해야 함'},status=422)
+    if not settings.SYNC_PIPELINE:
+        try: return queued_response(p,queue_2d(p,[],p.meeting.analysis))
+        except Exception as exc: return Response({'error':f'작업 큐 등록 실패: {exc}'},status=503)
     try: services.generate_2d(p,[],p.meeting.analysis); p.meeting.status='2d_ready'; p.meeting.save()
     except Exception as exc: return Response({'error':str(exc)},status=502)
     return Response({'project':project_data(p)})

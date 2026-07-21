@@ -9,6 +9,11 @@ final class ControlPlaneClient
 
     public function proxy(string $method, string $path): never
     {
+        // Local AI generation can legitimately take several minutes. cURL's
+        // timeout does not override PHP's own request execution limit.
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
         $url = $this->baseUrl . $path;
         $query = $_SERVER['QUERY_STRING'] ?? '';
         if ($query !== '') {
@@ -19,6 +24,14 @@ final class ControlPlaneClient
         }
         $ch = curl_init($url);
         $headers = ['Accept: application/json'];
+        $serviceToken = Config::controlPlaneToken();
+        if ($serviceToken !== '') {
+            $headers[] = 'X-Internal-Token: ' . $serviceToken;
+        }
+        $authorization = trim((string)($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
+        if (preg_match('/^Bearer\s+[A-Za-z0-9._~:+\/-]+$/', $authorization) === 1) {
+            $headers[] = 'Authorization: ' . $authorization;
+        }
         $body = null;
         $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
         if (str_starts_with(strtolower($contentType), 'multipart/form-data')) {

@@ -42,19 +42,31 @@ try {
     </script>
 </head>
 <body>
+<section class="auth-gate" id="authGate" hidden aria-labelledby="authTitle">
+    <form class="auth-card" id="authForm">
+        <span class="brand-mark">X</span>
+        <div><span class="eyebrow">CORPORATE ACCESS</span><h1 id="authTitle">사내 계정 로그인</h1></div>
+        <p>접속 정보는 사내 인증 DB에서만 확인하며 이 서비스에 비밀번호를 저장하지 않음.</p>
+        <label>사번·아이디<input id="authUsername" name="username" autocomplete="username" required></label>
+        <label>비밀번호<input id="authPassword" name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary-btn" type="submit" id="authSubmit">로그인</button>
+        <p class="auth-error" id="authError" role="alert"></p>
+    </form>
+</section>
 <div class="app-shell">
     <header class="topbar">
         <a class="brand" href="/" aria-label="홈">
             <span class="brand-mark">X</span>
             <span><strong>X concep AI</strong><small>Image · Mesh · Structure · OpenUSD</small></span>
         </a>
-        <button class="ghost-btn" id="historyButton" type="button">작업 이력</button>
+        <div class="topbar-actions"><span id="authUser" hidden></span><button class="ghost-btn" id="logoutButton" type="button" hidden>로그아웃</button><button class="ghost-btn" id="historyButton" type="button">작업 이력</button></div>
     </header>
     <div class="system-strip" id="systemStrip">
-        <span><i></i> GPT Image API</span>
+        <span><i></i> ComfyUI · FLUX Local</span>
+        <span><i></i> OpenAI Images Optional</span>
         <span><i></i> Gemma 4 Local · vLLM/Ray</span>
         <span><i></i> Local Speech</span>
-        <span><i></i> Hunyuan3D Local</span>
+        <span><i></i> TripoSR Local</span>
         <span><i></i> OpenSCAD Structure</span>
         <span><i></i> Blender Asset Bridge</span>
         <span><i></i> OpenUSD Layers</span>
@@ -128,7 +140,7 @@ try {
                         <summary>고급 설정</summary>
                         <div class="advanced-grid">
                             <label>품질 프로필<select name="quality_profile" id="qualityProfile"><option value="preview">Preview</option><option value="standard" selected>Standard</option><option value="final">Final</option></select></label>
-                            <label>엔진 직접 선택<select name="engine_override" id="engineOverride"><option value="">자동 라우팅</option><option value="hunyuan3d">Hunyuan3D</option><option value="openscad">OpenSCAD</option><option value="blender">Blender</option><option value="hybrid">Hybrid</option></select></label>
+                            <label>엔진 직접 선택<select name="engine_override" id="engineOverride"><option value="">자동 라우팅</option><option value="hunyuan3d">TripoSR 이미지 3D</option><option value="openscad">OpenSCAD</option><option value="blender">Blender</option><option value="hybrid">Hybrid</option></select></label>
                         </div>
                     </details>
                 </div>
