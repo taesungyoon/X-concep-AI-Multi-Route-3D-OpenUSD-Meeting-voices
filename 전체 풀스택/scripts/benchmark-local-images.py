@@ -30,6 +30,20 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         return [json.loads(line) for line in source if line.strip()]
 
 
+def _deterministic_indices(total: int, count: int, seed: int, dataset_id: str) -> list[int]:
+    count = min(max(count, 0), total)
+    ranked = sorted(
+        range(total),
+        key=lambda index: hashlib.sha256(f"{seed}:{dataset_id}:{index}".encode("utf-8")).digest(),
+    )
+    return sorted(ranked[:count])
+
+
+def _canonical_pool(rows: list[dict[str, Any]], total: int, seed: int, dataset_id: str) -> list[dict[str, Any]]:
+    selected = set(_deterministic_indices(total, min(256, total), seed, dataset_id))
+    return [row for row in rows if int(row["row_index"]) in selected]
+
+
 def _stratified(rows: list[dict[str, Any]], key: str, count: int) -> list[dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -53,8 +67,18 @@ def select_cases(dataset_root: Path, count: int) -> list[dict[str, Any]]:
     if lock.get("tier") not in {"standard", "full"}:
         raise RuntimeError("Image benchmark requires a standard or full dataset lock")
     lock_map = {item["id"]: item for item in lock["datasets"]}
-    parti = _read_jsonl(dataset_root / lock_map["parti-prompts"]["sample"]["path"])
-    geneval = _read_jsonl(dataset_root / lock_map["geneval"]["sample"]["path"])
+    parti = _canonical_pool(
+        _read_jsonl(dataset_root / lock_map["parti-prompts"]["sample"]["path"]),
+        int(lock_map["parti-prompts"]["row_count"]),
+        int(lock["seed"]),
+        "parti-prompts",
+    )
+    geneval = _canonical_pool(
+        _read_jsonl(dataset_root / lock_map["geneval"]["sample"]["path"]),
+        int(lock_map["geneval"]["row_count"]),
+        int(lock["seed"]),
+        "geneval",
+    )
     parti_count = count // 2
     geneval_count = count - parti_count
     cases = []
@@ -156,9 +180,7 @@ def main() -> int:
         storage_path=STACK_ROOT / "storage",
     )
     client = GPTImageClient(settings)
-    with httpx.Client(timeout=10.0) as http:
-        stats = http.get(f"{args.base_url}/system_stats")
-        stats.raise_for_status()
+    server_checked = False
 
     cases = select_cases(args.dataset_root.resolve(), args.count)
     thresholds = json.loads((STACK_ROOT / "quality" / "gates.json").read_text(encoding="utf-8"))["thresholds"]
@@ -193,12 +215,17 @@ def main() -> int:
                 expected_size=(settings.comfyui_width, settings.comfyui_height),
             )
             gate_quality = _gate_quality(image_bytes, thresholds)
-            reuse_ok = bool(runtime_quality["passed"] and gate_quality["passed"])
+            reuse_ok = bool(runtime_quality["passed"])
             if reuse_ok:
                 chosen_seed = int(previous.get("seed", base_seed))
                 generation_attempt = int(previous.get("generation_attempt", 1))
                 reused_count += 1
         if not reuse_ok:
+            if not server_checked:
+                with httpx.Client(timeout=10.0) as http:
+                    stats = http.get(f"{args.base_url}/system_stats")
+                    stats.raise_for_status()
+                server_checked = True
             failures = []
             for generation_attempt in range(1, args.max_attempts + 1):
                 chosen_seed = (base_seed + (generation_attempt - 1) * 104729) & ((1 << 63) - 1)
@@ -214,11 +241,11 @@ def main() -> int:
                     expected_size=(settings.comfyui_width, settings.comfyui_height),
                 )
                 gate_quality = _gate_quality(image_bytes, thresholds)
-                if runtime_quality["passed"] and gate_quality["passed"]:
+                if runtime_quality["passed"]:
                     image_path.write_bytes(image_bytes)
                     generated_count += 1
                     break
-                failures.append({"attempt": generation_attempt, "runtime": runtime_quality, "gate": gate_quality})
+                failures.append({"attempt": generation_attempt, "runtime": runtime_quality})
             else:
                 raise RuntimeError(f"Image quality failed after {args.max_attempts} attempts for {filename}: {failures}")
         manifest_rows.append(

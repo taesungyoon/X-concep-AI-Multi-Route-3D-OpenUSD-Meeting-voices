@@ -88,7 +88,7 @@ def generate_2d(project, image_assets=None, meeting_analysis=None, job=None):
     except Exception as exc:
         project.status='failed'; project.save(update_fields=['status','updated_at']); fail_job(job,exc); raise
 
-def generate_3d(project, selected, output_goal=None, quality_profile=None, engine_override=None, job=None):
+def generate_3d(project, selected, output_goal=None, quality_profile=None, engine_override=None, regeneration_scope=None, regeneration_reason='', job=None):
     output_goal=(output_goal or project.output_goal or 'auto').strip()
     quality_profile=(quality_profile or project.quality_profile or 'standard').strip()
     if output_goal not in {'auto','fast','structural','high_quality','motion_openusd'}:
@@ -108,6 +108,9 @@ def generate_3d(project, selected, output_goal=None, quality_profile=None, engin
         'quality_profile':quality_profile,
         'engine_override':engine_override or None,
         'previous_design_state':project.design_state,
+        'previous_geometry_contract':(project.result_3d or {}).get('geometry_contract'),
+        'regeneration_scope':list(regeneration_scope or []),
+        'regeneration_reason':str(regeneration_reason or ''),
     }
     job=start_existing_job(job) if job else create_job(project,'generate_3d',payload)
     project.status='generating_3d'; project.progress=35; project.step='result'; project.selected_2d_id=selected.concept_id
@@ -131,6 +134,9 @@ def generate_3d(project, selected, output_goal=None, quality_profile=None, engin
             'active_asset':route_key,
             'validation_grade':result.get('validation_grade','concept'),
             'score':(result.get('validation') or {}).get('score'),
+            'regeneration_scope':list(regeneration_scope or []),
+            'regeneration_reason':str(regeneration_reason or ''),
+            'partial_regeneration':result.get('partial_regeneration'),
         })
         project.generation_history=history[-50:]
         project.result_3d=current

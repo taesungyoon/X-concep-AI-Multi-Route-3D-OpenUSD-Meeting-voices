@@ -14,6 +14,7 @@ import httpx
 from PIL import Image, ImageOps
 
 from .generator import generate_2d
+from .image_precision import choose_verified_route, route_prompt
 from .image_quality import validate_generated_image
 from .image_usage import OpenAIImageUsageLedger
 from .settings import Settings
@@ -68,21 +69,75 @@ class GPTImageClient:
         }
         for index, variant in enumerate(variants[: self.settings.image_concept_count], start=1):
             output_path = output_dir / f"concept-{index}.png"
-            image_prompt = str(variant.get("image_prompt") or prompt)
-            image_prompt += "\nPreserve the functional mechanism and engineering constraints from the reference. Generate one product only."
+            raw_image_prompt = str(variant.get("image_prompt") or prompt)
+            raw_image_prompt += "\nPreserve the functional mechanism and engineering constraints from the reference."
+            structured_requirements = (
+                variant.get("image_requirements")
+                or analysis.get("image_requirements")
+                or analysis.get("objects")
+                or []
+            )
+            requested_route, image_prompt = route_prompt(
+                raw_image_prompt,
+                stratum=str(variant.get("image_task") or analysis.get("image_task") or category),
+                requirements=structured_requirements,
+            )
+            if requested_route == "fast":
+                image_prompt += "\nGenerate one product only."
+            route_name = requested_route
+            semantic_verification = None
             started = time.monotonic()
             if self.settings.openai_image_mode == "comfyui":
-                quality = None
-                for attempt in range(1, self.settings.comfyui_max_attempts + 1):
-                    image_bytes = self._call_comfyui(image_prompt, contact_sheet, project_id, index)
-                    quality = validate_generated_image(
-                        image_bytes,
-                        self.settings,
-                        expected_size=(self.settings.comfyui_width, self.settings.comfyui_height),
+                if requested_route == "precision" and structured_requirements and self.settings.image_semantic_verifier_url:
+                    shared_seed = secrets.randbits(63)
+                    precision_bytes, precision_quality, precision_seed = self._generate_comfyui_candidate(
+                        image_prompt, contact_sheet, project_id, index, noise_seed=shared_seed,
                     )
-                    if quality["passed"]:
-                        break
-                assert quality is not None
+                    self._require_image_quality(precision_quality)
+                    precision_verification = self._verify_semantics(precision_bytes, structured_requirements)
+                    image_bytes, quality = precision_bytes, precision_quality
+                    raw_verification = None
+                    selection_reason = "precision_verified"
+                    selected_prompt = image_prompt
+                    if not precision_verification["passed"]:
+                        raw_bytes, raw_quality, raw_seed = self._generate_comfyui_candidate(
+                            raw_image_prompt,
+                            contact_sheet,
+                            project_id,
+                            index,
+                            noise_seed=precision_seed,
+                            max_attempts=1,
+                        )
+                        if raw_quality["passed"]:
+                            raw_verification = self._verify_semantics(raw_bytes, structured_requirements)
+                        else:
+                            raw_verification = {
+                                "passed": False,
+                                "evaluator": precision_verification.get("evaluator"),
+                                "reasons": ["basic_quality_failed"],
+                                "quality": raw_quality,
+                            }
+                        route_name, selection_reason = choose_verified_route(
+                            raw_passed=raw_verification["passed"],
+                            precision_passed=precision_verification["passed"],
+                        )
+                        if route_name == "raw":
+                            image_bytes, quality, selected_prompt = raw_bytes, raw_quality, raw_image_prompt
+                    semantic_verification = {
+                        "evaluator": precision_verification.get("evaluator"),
+                        "shared_noise_seed": precision_seed,
+                        "requested_noise_seed": shared_seed,
+                        "precision_noise_seed": precision_seed,
+                        "raw_noise_seed": raw_seed if raw_verification is not None else None,
+                        "selection_reason": selection_reason,
+                        "precision": precision_verification,
+                        "raw": raw_verification,
+                    }
+                    image_prompt = selected_prompt
+                else:
+                    image_bytes, quality, _ = self._generate_comfyui_candidate(
+                        image_prompt, contact_sheet, project_id, index,
+                    )
             else:
                 image_bytes = self._call_api(image_prompt, contact_sheet, project_id, index)
                 quality = validate_generated_image(
@@ -90,9 +145,7 @@ class GPTImageClient:
                     self.settings,
                     expected_size=_parse_size(self.settings.openai_image_size),
                 )
-            if not quality["passed"]:
-                failed = [item["id"] for item in quality["checks"] if not item["passed"]]
-                raise RuntimeError(f"생성 이미지 품질 검증 실패: {', '.join(failed)}")
+            self._require_image_quality(quality)
             output_path.write_bytes(image_bytes)
             with Image.open(output_path) as generated:
                 generated.verify()
@@ -103,20 +156,81 @@ class GPTImageClient:
                 "url": f"{self.settings.public_storage_prefix}/projects/{project_id}/concepts/{output_path.name}",
                 "absolute_path": str(output_path),
                 "provider": self.settings.openai_image_mode,
+                "route": route_name,
+                "requested_route": requested_route,
                 "quality": quality,
+                "semantic_verification": semantic_verification,
             }
             results.append(item)
             manifest["concepts"].append({
                 "id": item["id"],
                 "file": output_path.name,
                 "prompt_sha256": hashlib.sha256(image_prompt.encode("utf-8")).hexdigest(),
+                "route": route_name,
+                "requested_route": requested_route,
                 "duration_seconds": round(time.monotonic() - started, 3),
                 "quality": quality,
+                "semantic_verification": semantic_verification,
             })
         (project / "concept_generation_manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         return results
+
+    def _generate_comfyui_candidate(
+        self,
+        prompt: str,
+        reference_image: Path | None,
+        project_id: str,
+        variant_index: int,
+        *,
+        noise_seed: int | None = None,
+        max_attempts: int | None = None,
+    ) -> tuple[bytes, dict[str, Any], int | None]:
+        quality = None
+        image_bytes = b""
+        actual_seed = noise_seed
+        attempts = self.settings.comfyui_max_attempts if max_attempts is None else max_attempts
+        for attempt in range(1, attempts + 1):
+            attempt_seed = noise_seed if noise_seed is None else noise_seed + attempt - 1
+            actual_seed = attempt_seed
+            if attempt_seed is None:
+                image_bytes = self._call_comfyui(prompt, reference_image, project_id, variant_index)
+            else:
+                image_bytes = self._call_comfyui(
+                    prompt, reference_image, project_id, variant_index, noise_seed=attempt_seed,
+                )
+            quality = validate_generated_image(
+                image_bytes, self.settings,
+                expected_size=(self.settings.comfyui_width, self.settings.comfyui_height),
+            )
+            if quality["passed"]:
+                break
+        assert quality is not None
+        return image_bytes, quality, actual_seed
+
+    @staticmethod
+    def _require_image_quality(quality: dict[str, Any]) -> None:
+        if quality["passed"]:
+            return
+        failed = [item["id"] for item in quality["checks"] if not item["passed"]]
+        raise RuntimeError(f"생성 이미지 품질 검증 실패: {', '.join(failed)}")
+
+    def _verify_semantics(self, image_bytes: bytes, requirements: list[dict[str, Any]]) -> dict[str, Any]:
+        timeout = httpx.Timeout(float(self.settings.image_semantic_verifier_timeout_seconds), connect=10.0)
+        with httpx.Client(timeout=timeout) as client:
+            response = client.post(
+                f"{self.settings.image_semantic_verifier_url}/verify",
+                json={
+                    "image_base64": base64.b64encode(image_bytes).decode("ascii"),
+                    "requirements": requirements,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        if not isinstance(payload.get("passed"), bool):
+            raise RuntimeError("로컬 의미 검증기 응답에 passed boolean이 없음")
+        return payload
 
     def _call_comfyui(
         self,
@@ -124,6 +238,7 @@ class GPTImageClient:
         reference_image: Path | None,
         project_id: str,
         variant_index: int,
+        noise_seed: int | None = None,
     ) -> bytes:
         base_url = self.settings.comfyui_base_url
         timeout = httpx.Timeout(float(self.settings.comfyui_timeout_seconds), connect=15.0)
@@ -149,6 +264,8 @@ class GPTImageClient:
                 uploaded_name,
                 f"xconcep/{project_id}/concept-{variant_index}",
             )
+            if noise_seed is not None:
+                workflow["7"]["inputs"]["noise_seed"] = noise_seed
             response = client.post(f"{base_url}/prompt", json={"prompt": workflow, "client_id": client_id})
             response.raise_for_status()
             payload = response.json()

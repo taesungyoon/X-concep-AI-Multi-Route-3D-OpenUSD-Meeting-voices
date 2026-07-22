@@ -24,7 +24,10 @@ def export_openusd(
     enable_variants: bool = True,
     generate_layers: bool = True,
     source_usd_path: Path | None = None,
+    composition_arc: str = "reference",
 ) -> dict[str, Any]:
+    if composition_arc not in {"reference", "payload"}:
+        raise OpenUSDExportError("composition_arc must be reference or payload")
     output_dir.mkdir(parents=True, exist_ok=True)
     scene = trimesh.load(glb_path, force="scene")
     if isinstance(scene, trimesh.Trimesh):
@@ -55,6 +58,7 @@ def export_openusd(
             enable_physics=enable_physics,
             enable_variants=enable_variants,
             source_usd_path=source_usd_path,
+            composition_arc=composition_arc,
         )
     return {
         "usda": str(usda_path),
@@ -75,6 +79,7 @@ def validate_usda(path: Path) -> dict[str, Any]:
         "physics_enabled": "PhysicsCollisionAPI" in text or "PhysicsScene" in text,
         "variant_enabled": "variantSet" in text or "variantSets" in text,
         "meeting_metadata": "xconcep_meetingSummary" in text,
+        "assembly_component_count": text.count("xconcep:requirementId"),
         "size_bytes": path.stat().st_size,
         "parser_available": False,
         "parser_valid": None,
@@ -113,6 +118,7 @@ def _write_layered_package(
     enable_physics: bool,
     enable_variants: bool,
     source_usd_path: Path | None = None,
+    composition_arc: str = "reference",
 ) -> tuple[dict[str, str], Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     revisions_dir = output_dir / "revisions"
@@ -120,7 +126,11 @@ def _write_layered_package(
 
     geometry = output_dir / "geometry.usda"
     looks = output_dir / "looks.usda"
-    render_asset = output_dir / "render_asset.usdc"
+    assembly = output_dir / "assembly.usda"
+    source_suffix = source_usd_path.suffix.lower() if source_usd_path else ".usdc"
+    if source_suffix not in {".usd", ".usda", ".usdc"}:
+        source_suffix = ".usdc"
+    render_asset = output_dir / f"render_asset{source_suffix}"
     meeting = output_dir / "meeting.usda"
     revision_layer = revisions_dir / f"rev_{revision:03d}.usda"
     root = output_dir / "root.usda"
@@ -132,14 +142,19 @@ def _write_layered_package(
     else:
         _write_geometry_layer(scene, geometry, enable_physics)
         _write_looks_layer(scene, looks)
+    geometry_contract = metadata.get("geometry_contract") or {}
+    has_assembly = bool(geometry_contract.get("components"))
+    if has_assembly:
+        _write_assembly_layer(assembly, geometry_contract)
     _write_meeting_layer(meeting, metadata, meeting_analysis, revision)
     _write_revision_layer(revision_layer, meeting_analysis, revision)
 
     asset_decl = ['    def Xform "Asset"']
     if use_render_asset:
+        arc_name = "references" if composition_arc == "reference" else "payload"
         asset_decl.extend([
             "    (",
-            "        prepend references = @./render_asset.usdc@",
+            f"        prepend {arc_name} = @./{render_asset.name}@",
             "    )",
         ])
     elif enable_variants:
@@ -163,6 +178,8 @@ def _write_layered_package(
     sublayers = []
     if not use_render_asset:
         sublayers.extend(["        @./geometry.usda@,", "        @./looks.usda@,"])
+    if has_assembly:
+        sublayers.append("        @./assembly.usda@,")
     sublayers.extend(["        @./meeting.usda@,", f"        @./revisions/rev_{revision:03d}.usda@"] )
     root.write_text(
         "\n".join([
@@ -191,7 +208,8 @@ def _write_layered_package(
         "revision": revision,
         "default_stage": "root.usda",
         "layers": {
-            **({"render_asset": "render_asset.usdc"} if use_render_asset else {"geometry": "geometry.usda", "looks": "looks.usda"}),
+            **({"render_asset": render_asset.name} if use_render_asset else {"geometry": "geometry.usda", "looks": "looks.usda"}),
+            **({"assembly": "assembly.usda"} if has_assembly else {}),
             "meeting": "meeting.usda",
             "revision": f"revisions/rev_{revision:03d}.usda",
         },
@@ -202,6 +220,7 @@ def _write_layered_package(
             "asset_validation": True,
             "physx_ready": enable_physics,
             "variants": enable_variants,
+            "composition_arc": composition_arc,
         },
         "metadata": metadata,
         "meeting_analysis": meeting_analysis or {},
@@ -219,7 +238,43 @@ def _write_layered_package(
     else:
         layer_paths["geometry"] = str(geometry)
         layer_paths["looks"] = str(looks)
+    if has_assembly:
+        layer_paths["assembly"] = str(assembly)
     return layer_paths, manifest_path
+
+
+def _write_assembly_layer(path: Path, contract: dict[str, Any]) -> None:
+    lines = [
+        "#usda 1.0",
+        "",
+        'over Xform "World"',
+        "{",
+        '    over Xform "Asset"',
+        "    {",
+        '        def Xform "Assembly"',
+        "        {",
+        f'            custom string xconcep:generatorMode = "{_escape(str(contract.get("generator_mode", "")))}"',
+        f'            custom string xconcep:generatorVersion = "{_escape(str(contract.get("generator_version", "")))}"',
+        f'            custom string xconcep:contractSha256 = "{_escape(str(contract.get("contract_sha256", "")))}"',
+        f'            custom string xconcep:relationshipsJson = "{_escape(json.dumps(contract.get("relationships") or [], ensure_ascii=False))}"',
+    ]
+    used: set[str] = set()
+    for index, component in enumerate(contract.get("components") or [], start=1):
+        name = _identifier(str(component.get("id") or f"Component_{index}"), used)
+        center = _mm_vec_to_m(component.get("center_mm"), (0.0, 0.0, 0.0))
+        size = _mm_vec_to_m(component.get("size_mm"), (0.0, 0.0, 0.0))
+        lines.extend([
+            f'            def Xform "{name}"',
+            "            {",
+            f'                custom string xconcep:componentId = "{_escape(str(component.get("id") or name))}"',
+            f'                custom string xconcep:kind = "{_escape(str(component.get("kind") or "component"))}"',
+            f'                custom string xconcep:requirementId = "{_escape(str(component.get("requirement_id") or component.get("kind") or "component"))}"',
+            f"                custom double3 xconcep:bboxCenterM = {_vec3(center)}",
+            f"                custom double3 xconcep:bboxSizeM = {_vec3(size)}",
+            "            }",
+        ])
+    lines.extend(["        }", "    }", "}", ""])
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def _write_geometry_layer(scene: trimesh.Scene, path: Path, enable_physics: bool) -> None:
@@ -499,3 +554,12 @@ def _escape(value: str) -> str:
 def _vec3(value: Any) -> str:
     x, y, z = [float(v) for v in value]
     return f"({x:.7g}, {y:.7g}, {z:.7g})"
+
+
+def _mm_vec_to_m(value: Any, default: tuple[float, float, float]) -> tuple[float, float, float]:
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        value = default
+    try:
+        return tuple(float(item) / 1000.0 for item in value)  # type: ignore[return-value]
+    except (TypeError, ValueError):
+        return tuple(float(item) / 1000.0 for item in default)

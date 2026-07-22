@@ -542,6 +542,10 @@ def main() -> int:
     }
     run_root = output_root / run_id
     run_root.mkdir(parents=True, exist_ok=False)
+    if previous:
+        (run_root / "previous-report.json").write_text(
+            json.dumps(previous, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     json_text = json.dumps(report, ensure_ascii=False, indent=2)
     markdown = _markdown(report)
     (run_root / "report.json").write_text(json_text, encoding="utf-8")

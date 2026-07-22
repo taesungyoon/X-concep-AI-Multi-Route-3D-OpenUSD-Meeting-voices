@@ -12,6 +12,8 @@ python scripts/run-quality-program.py --tier smoke
 
 캐시만으로 재현하려면 첫 명령에 `--offline`을 추가한다. 표본은 seed `20260721`과 SHA-256 순위로 선택되어 Python 버전과 실행 순서에 의존하지 않는다. 결과는 `storage/quality-program/latest.json`, `latest.md`와 각 실행별 JUnit XML에 기록된다.
 
+이미지 benchmark의 canonical pool은 등급과 무관하게 같은 SHA-256 순위 256행으로 고정된다. 따라서 `standard`에서 만든 60장과 `full`에서 검증하는 60장의 row index가 동일하다. `--reuse-existing`은 ComfyUI가 꺼져 있어도 파일을 다시 검증하며, 실제 생성이 필요할 때만 로컬 서버에 연결한다.
+
 ## 등급 계약
 
 | 등급 | 용도 | 실제 생성/네이티브 도구 요구 |
@@ -66,6 +68,16 @@ python scripts/sync-quality-datasets.py --tier full --offline
 python scripts/benchmark-public-cad.py
 python scripts/run-quality-program.py --tier full
 ```
+
+2026-07-21 고정 기준선은 다음과 같다.
+
+- 기본 이미지: 60건 중 59건(98.33%), 정확 중복 0%. PartiPrompts의 단어 하나짜리 `element` 표본은 의도적으로 미니멀한 출력(entropy 1.9635)이어서 실패 증거로 보존했다.
+- 의미 정합성: Grounding DINO 기준 29/30(96.67%), 임계치 95%. 유일한 실패는 `fork above a hair drier`에서 헤어드라이어 형상이 비정형으로 생성된 사례다.
+- 공개 CAD: NIST AP242 full 17/17(100%), standard 고정 표본 9/9(100%).
+- 네이티브 CAD: OpenSCAD/Blender 25/25(100%).
+- OpenUSD: 공식 ASWF 표본 stage open 100%, validator error 0.
+
+개별 이미지 entropy 100%를 강제하지 않고 전체 95% 계약을 사용한다. 모호하거나 미니멀한 공개 프롬프트를 통과시키기 위해 표본·프롬프트·seed를 사후 변경하지 않는다.
 
 OpenAI Image API 실호출은 기존 합의대로 키 입력 직전에 사용자를 호출한 뒤에만 수행한다.
 

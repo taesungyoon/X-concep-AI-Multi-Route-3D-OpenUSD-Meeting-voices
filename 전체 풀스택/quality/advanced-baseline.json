@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "xconcep-local-advanced-v3",
+  "reports": [
+    {"id": "native-cad", "path": "storage/benchmarks/native-cad/latest.json", "checks": [{"path": "passed", "operator": "eq", "value": true}, {"path": "acceptance_rate_pct", "operator": "min", "value": 95.0}]},
+    {"id": "nist-pmi", "path": "storage/benchmarks/public-cad-nist/latest.json", "checks": [{"path": "passed", "operator": "eq", "value": true}, {"path": "acceptance_rate_pct", "operator": "min", "value": 100.0}]},
+    {"id": "cad-roundtrip", "path": "storage/benchmarks/cad-roundtrip/latest.json", "checks": [{"path": "passed", "operator": "eq", "value": true}, {"path": "acceptance_rate_pct", "operator": "min", "value": 95.0}]},
+    {"id": "openusd-advanced", "path": "storage/benchmarks/openusd-advanced/latest.json", "checks": [{"path": "passed", "operator": "eq", "value": true}]},
+    {"id": "image-router-holdout", "path": "storage/quality-results/image-router-holdout/summary.json", "checks": [{"path": "passed", "operator": "eq", "value": true}]},
+    {"id": "image-semantic-selected", "path": "storage/quality-results/image-router-selected/report.json", "checks": [{"path": "passed", "operator": "eq", "value": true}, {"path": "overall_score_pct", "operator": "min", "value": 95.0}, {"path": "minimum_seed_score_pct", "operator": "min", "value": 95.0}, {"path": "independent_evaluation", "operator": "eq", "value": false}]},
+    {"id": "evaluation-reliability-precision", "path": "storage/quality-results/reliability-precision/report.json", "checks": [{"path": "passed", "operator": "eq", "value": true}]},
+    {"id": "runtime-image-semantic-routing", "path": "storage/quality-results/runtime-semantic-smoke/report.json", "checks": [{"path": "passed", "operator": "eq", "value": true}, {"path": "requested_route", "operator": "eq", "value": "precision"}, {"path": "selected_route", "operator": "eq", "value": "raw"}, {"path": "selection_reason", "operator": "eq", "value": "precision_failed_raw_verified"}, {"path": "seed_match", "operator": "eq", "value": true}, {"path": "independent_evaluation", "operator": "eq", "value": false}]}
+  ]
+}

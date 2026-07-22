@@ -63,6 +63,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       SYNC_PIPELINE: ${SYNC_PIPELINE:-false}
+      RUN_MIGRATIONS: "true"
     volumes: ["./storage:/app/storage"]
     depends_on:
       mysql: {condition: service_healthy}
@@ -78,7 +79,9 @@ services:
   celery-worker:
     build: ./control-plane-drf
     command: celery -A config.celery worker -l INFO
-    environment: *control_env
+    environment:
+      <<: *control_env
+      RUN_MIGRATIONS: "false"
     volumes: ["./storage:/app/storage"]
     depends_on: [control-plane, redis]
     restart: unless-stopped
@@ -167,6 +170,8 @@ services:
       IMAGE_MIN_FILE_BYTES: ${IMAGE_MIN_FILE_BYTES:-10000}
       IMAGE_MIN_CHANNEL_STDDEV: ${IMAGE_MIN_CHANNEL_STDDEV:-3.0}
       IMAGE_REQUIRE_EXPECTED_ASPECT: ${IMAGE_REQUIRE_EXPECTED_ASPECT:-true}
+      IMAGE_SEMANTIC_VERIFIER_URL: ${IMAGE_SEMANTIC_VERIFIER_URL:-}
+      IMAGE_SEMANTIC_VERIFIER_TIMEOUT_SECONDS: ${IMAGE_SEMANTIC_VERIFIER_TIMEOUT_SECONDS:-120}
       SHAPE_MODE: ${SHAPE_MODE:-triposr}
       SHAPE_PROVIDER: ${SHAPE_PROVIDER:-triposr}
       SHAPE_API_URL: ${SHAPE_API_URL:-http://host.docker.internal:8081}

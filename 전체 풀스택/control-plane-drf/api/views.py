@@ -1,3 +1,4 @@
+import re
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
@@ -140,16 +141,26 @@ def project_generate_3d(request,project_id):
     output_goal=(request.data.get('output_goal') or p.output_goal or 'auto').strip()
     quality_profile=(request.data.get('quality_profile') or p.quality_profile or 'standard').strip()
     engine_override=(request.data.get('engine_override') or '').strip() or None
+    raw_scope=request.data.get('regeneration_scope') or []
+    if isinstance(raw_scope,str): raw_scope=[raw_scope]
+    if not isinstance(raw_scope,list):
+        return Response({'error':'부분 재생성 범위는 배열이어야 함'},status=422)
+    regeneration_scope=[str(value).strip() for value in raw_scope if str(value).strip()]
+    if len(regeneration_scope)>32 or any(len(value)>80 or not re.fullmatch(r'[A-Za-z0-9_:-]+',value) for value in regeneration_scope):
+        return Response({'error':'부분 재생성 범위 형식이 올바르지 않음'},status=422)
+    regeneration_reason=str(request.data.get('regeneration_reason') or '').strip()
+    if len(regeneration_reason)>500:
+        return Response({'error':'부분 재생성 사유가 너무 김'},status=422)
     if not settings.SYNC_PIPELINE:
-        payload={'concept_pk':selected.pk,'output_goal':output_goal,'quality_profile':quality_profile,'engine_override':engine_override}
+        payload={'concept_pk':selected.pk,'output_goal':output_goal,'quality_profile':quality_profile,'engine_override':engine_override,'regeneration_scope':regeneration_scope,'regeneration_reason':regeneration_reason}
         job=services.create_queued_job(p,'generate_3d',payload)
         p.status='queued_3d'; p.progress=0; p.step='result'; p.save()
-        try: generate_3d_task.delay(str(job.id),selected.pk,output_goal,quality_profile,engine_override)
+        try: generate_3d_task.delay(str(job.id),selected.pk,output_goal,quality_profile,engine_override,regeneration_scope,regeneration_reason)
         except Exception as exc:
             services.fail_job(job,exc); p.status='failed'; p.save(update_fields=['status','updated_at'])
             return Response({'error':f'작업 큐 등록 실패: {exc}'},status=503)
         return queued_response(p,job)
-    try: services.generate_3d(p,selected,output_goal,quality_profile,engine_override)
+    try: services.generate_3d(p,selected,output_goal,quality_profile,engine_override,regeneration_scope,regeneration_reason)
     except Exception as exc: return Response({'error':str(exc)},status=502)
     return Response({'project':project_data(p)})
 

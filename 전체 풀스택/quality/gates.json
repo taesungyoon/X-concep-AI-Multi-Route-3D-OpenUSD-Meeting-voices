@@ -49,8 +49,12 @@
     "image_basic_pass_rate_pct": 95.0,
     "image_max_exact_duplicate_rate_pct": 2.0,
     "image_semantic_score_pct": 95.0,
+    "image_reliability_holdout_cases": 120,
+    "image_reliability_seed_count": 3,
+    "image_evaluator_agreement_pct": 90.0,
     "native_cad_acceptance_rate_pct": 95.0,
     "public_cad_acceptance_rate_pct": 100.0,
+    "cad_roundtrip_acceptance_rate_pct": 95.0,
     "usd_stage_open_rate_pct": 100.0
   },
   "semantic_evaluator": {

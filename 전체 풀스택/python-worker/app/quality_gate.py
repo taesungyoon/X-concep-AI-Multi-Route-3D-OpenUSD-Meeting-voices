@@ -93,20 +93,79 @@ def validate_asset(
         })
 
     manifest_components = 0
+    manifest: dict[str, Any] = {}
     if manifest_path and manifest_path.exists():
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest_components = len(manifest.get("parts", []))
         except Exception:
+            manifest = {}
             manifest_components = 0
     required_components = len([item for item in design_state.get("components", []) if item.get("required", True)])
-    component_score = min(1.0, manifest_components / max(required_components, 1)) if manifest_components else (0.65 if route == "hunyuan3d" else 0.8)
+    coverage = manifest.get("requirement_coverage") or {}
+    component_rows = list(coverage.get("components") or [])
+    feature_rows = list(coverage.get("features") or [])
+    relationship_rows = list(coverage.get("relationships") or [])
+
+    if component_rows:
+        required_total = sum(max(1, int(item.get("required") or 1)) for item in component_rows)
+        represented_total = sum(min(max(0, int(item.get("represented") or 0)), max(1, int(item.get("required") or 1))) for item in component_rows)
+        component_score = represented_total / max(required_total, 1)
+        component_passed = all(bool(item.get("passed")) for item in component_rows)
+        component_value: Any = component_rows
+    else:
+        component_score = min(1.0, manifest_components / max(required_components, 1)) if manifest_components else (0.65 if route == "hunyuan3d" else 0.8)
+        component_passed = component_score >= 0.7
+        component_value = {"required": required_components, "represented": manifest_components or "mesh_estimate", "score": round(component_score, 3)}
     checks.append({
         "id": "component_contract",
         "label": "필수 구성요소 계약",
-        "passed": component_score >= 0.7,
-        "value": {"required": required_components, "represented": manifest_components or "mesh_estimate", "score": round(component_score, 3)},
+        "passed": component_passed,
+        "value": component_value,
     })
+
+    feature_score: float | None = None
+    if feature_rows:
+        required_total = sum(max(1, int(item.get("required") or 1)) for item in feature_rows)
+        represented_total = sum(min(max(0, int(item.get("represented") or 0)), max(1, int(item.get("required") or 1))) for item in feature_rows)
+        feature_score = represented_total / max(required_total, 1)
+        checks.append({
+            "id": "feature_contract",
+            "label": "필수 형상 특징 계약",
+            "passed": all(bool(item.get("passed")) for item in feature_rows),
+            "value": feature_rows,
+        })
+
+    relationship_score: float | None = None
+    if relationship_rows:
+        relationship_score = sum(bool(item.get("passed")) for item in relationship_rows) / len(relationship_rows)
+        checks.append({
+            "id": "relationship_contract",
+            "label": "구성요소 배치 관계 계약",
+            "passed": all(bool(item.get("passed")) for item in relationship_rows),
+            "value": relationship_rows,
+        })
+
+    multiview_validation = manifest.get("multiview_validation") or {}
+    multiview_score: float | None = None
+    if multiview_validation:
+        multiview_score = float(multiview_validation.get("score") or 0.0)
+        checks.append({
+            "id": "multiview_contract",
+            "label": "정면·상면·측면 계약 검증",
+            "passed": multiview_validation.get("passed") is True,
+            "value": multiview_validation.get("checks") or [],
+        })
+
+    semantic_validation = manifest.get("semantic_validation") or {}
+    semantic_passed = semantic_validation.get("passed") is True
+    if semantic_validation:
+        checks.append({
+            "id": "independent_semantic_validation",
+            "label": "독립 의미·형상 검증",
+            "passed": semantic_passed,
+            "value": semantic_validation,
+        })
 
     if route == "hunyuan3d":
         grade = "concept"
@@ -116,16 +175,30 @@ def validate_asset(
         grade = "concept"
 
     all_core_passed = all(check["passed"] for check in checks[:4])
-    contract_passed = all(check["passed"] for check in checks[4:]) if len(checks) > 4 else True
-    if all_core_passed and contract_passed and (route in {"openscad", "hybrid"} or blender_processed):
+    contract_passed = all(check["passed"] for check in checks[4:] if check["id"] != "independent_semantic_validation") if len(checks) > 4 else True
+    if all_core_passed and contract_passed and semantic_passed and (route in {"openscad", "hybrid"} or blender_processed):
         grade = "validated"
 
+    available_requirement_scores = [component_score]
+    if feature_score is not None:
+        available_requirement_scores.append(feature_score)
+    if relationship_score is not None:
+        available_requirement_scores.append(relationship_score)
+    functional_score = min(available_requirement_scores) if coverage else 0.5
+    silhouette_score = float(semantic_validation.get("silhouette_score") or 0.0)
+    detail_score = float(semantic_validation.get("detail_score") or (0.25 if blender_processed else 0.0))
+    dimension_layout_score = (
+        multiview_score
+        if multiview_score is not None
+        else dimension_score if dimension_score is not None
+        else relationship_score or 0.0
+    )
     scores = {
-        "functional_match": 0.9 if required_components else 0.75,
+        "functional_match": round(functional_score, 3),
         "component_match": round(component_score, 3),
-        "dimension_and_layout_match": round(dimension_score if dimension_score is not None else (0.55 if route == "hunyuan3d" else 0.82), 3),
-        "silhouette_match": 0.62 if route == "hunyuan3d" else 0.72,
-        "detail_appearance_match": 0.78 if blender_processed else (0.68 if route == "hunyuan3d" else 0.38),
+        "dimension_and_layout_match": round(dimension_layout_score, 3),
+        "silhouette_match": round(silhouette_score, 3),
+        "detail_appearance_match": round(detail_score, 3),
     }
     weighted = (
         scores["functional_match"] * 0.30
@@ -145,11 +218,17 @@ def validate_asset(
     return {
         "grade": grade,
         "grade_label": GRADE_LABELS[grade],
-        "automatic_grade_ceiling": "validated",
+        "automatic_grade_ceiling": "validated" if semantic_validation else "structured",
         "score": round(weighted, 3),
         "scores": scores,
         "checks": checks,
         "metrics": metrics,
+        "multiview": multiview_validation,
+        "regeneration_plan": multiview_validation.get("regeneration_plan") or {
+            "recommended": False,
+            "scopes": [],
+            "strategy": "none",
+        },
         "usage_scope": usage,
         "next_required_review": "엔지니어 검토" if grade in {"concept", "structured", "validated"} else "제조 승인",
         "manufacturing_note": (

@@ -12,7 +12,16 @@ from typing import Any
 import numpy as np
 import trimesh
 
+from .contract_validation import validate_contract_multiview
 from .generator import Part, _render_isometric
+from .parametric_generators import (
+    GENERATOR_VERSION,
+    SPECIALIZED_MODES,
+    build_geometry_contract,
+    parts_from_contract,
+    resolve_generator_mode,
+    write_specialized_scad,
+)
 
 
 @dataclass
@@ -179,6 +188,32 @@ def _stl_to_glb(stl_path: Path, glb_path: Path) -> None:
     glb_path.write_bytes(scene.export(file_type="glb"))
 
 
+def _contract_to_glb(contract: dict[str, Any], parts: list[Part], glb_path: Path) -> None:
+    """Preserve module/equipment component names and primitives in the GLB."""
+    scene = trimesh.Scene()
+    for item, part in zip(contract.get("components") or [], parts):
+        if item.get("shape") == "cylinder":
+            mesh = trimesh.creation.cylinder(
+                radius=float(item["diameter_mm"]) / 2000.0,
+                height=float(item["height_mm"]) / 1000.0,
+                sections=64,
+            )
+            axis = str(item.get("axis") or "Z").upper()
+            if axis == "X":
+                mesh.apply_transform(trimesh.transformations.rotation_matrix(math.pi / 2, (0, 1, 0)))
+            elif axis == "Y":
+                mesh.apply_transform(trimesh.transformations.rotation_matrix(math.pi / 2, (1, 0, 0)))
+        else:
+            mesh = trimesh.creation.box(extents=part.size)
+        mesh.apply_translation(part.center)
+        mesh.visual.face_colors = np.array(part.color, dtype=np.uint8)
+        name = str(item.get("id") or part.name)
+        scene.add_geometry(mesh, node_name=name, geom_name=name)
+    if not scene.geometry:
+        raise RuntimeError("GeometryContract에 GLB로 내보낼 컴포넌트가 없음")
+    glb_path.write_bytes(scene.export(file_type="glb"))
+
+
 def generate_openscad(
     *,
     design_state: dict[str, Any],
@@ -187,9 +222,22 @@ def generate_openscad(
     openscad_bin: str,
     timeout_seconds: int,
     mode: str,
+    generator_mode: str = "openscad",
+    geometry_contract: dict[str, Any] | None = None,
 ) -> OpenSCADResult:
     output_dir.mkdir(parents=True, exist_ok=True)
-    contract = _geometry_contract(design_state, category)
+    resolved_generator_mode = resolve_generator_mode(generator_mode, category)
+    specialized = resolved_generator_mode in SPECIALIZED_MODES
+    if specialized:
+        contract = geometry_contract or build_geometry_contract(design_state, category, resolved_generator_mode)
+        if contract.get("generator_mode") != resolved_generator_mode:
+            raise ValueError("GeometryContract generator_mode이 요청 모드와 다름")
+        parts = parts_from_contract(contract)
+    else:
+        contract = _geometry_contract(design_state, category)
+        contract["generator_mode"] = "openscad"
+        contract["generator_version"] = "legacy-1.0"
+        parts = _parts_from_contract(contract, category)
     geometry_json_path = output_dir / "geometry.json"
     geometry_json_path.write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding="utf-8")
     scad_path = output_dir / "model.scad"
@@ -197,7 +245,10 @@ def generate_openscad(
     glb_path = output_dir / "model_structural.glb"
     preview_path = output_dir / "render_structural.png"
     manifest_path = output_dir / "assembly_manifest.json"
-    _write_scad(scad_path, contract, category)
+    if specialized:
+        write_specialized_scad(scad_path, contract)
+    else:
+        _write_scad(scad_path, contract, category)
 
     binary = shutil.which(openscad_bin) or (str(Path(openscad_bin).resolve()) if Path(openscad_bin).is_file() else None)
     provider: dict[str, Any]
@@ -215,24 +266,34 @@ def generate_openscad(
             if mode == "native":
                 raise RuntimeError(f"OpenSCAD native generation failed: {completed.stderr[-1200:]}")
             provider = {"mode": "fallback", "engine": "openscad", "error": completed.stderr[-1200:]}
-            parts = _parts_from_contract(contract, category)
             _export_fallback_mesh(parts, glb_path, stl_path)
         else:
-            _stl_to_glb(stl_path, glb_path)
+            if specialized and category in {"module", "equipment"}:
+                _contract_to_glb(contract, parts, glb_path)
+            else:
+                _stl_to_glb(stl_path, glb_path)
             provider = {
                 "mode": "native", "engine": "openscad", "binary": binary, "command": command,
                 "returncode": completed.returncode, "duration_seconds": elapsed,
             }
     else:
-        parts = _parts_from_contract(contract, category)
         _export_fallback_mesh(parts, glb_path, stl_path)
+        if specialized and category in {"module", "equipment"}:
+            _contract_to_glb(contract, parts, glb_path)
         provider = {"mode": "mock" if mode == "mock" else "fallback", "engine": "openscad", "binary_found": bool(binary)}
 
-    parts = _parts_from_contract(contract, category)
+    provider["generator_mode"] = resolved_generator_mode
+    provider["generator_version"] = GENERATOR_VERSION if specialized else "legacy-1.0"
     _render_isometric(preview_path, parts, str(design_state.get("purpose") or design_state.get("source_prompt") or ""))
+    multiview_validation = (
+        validate_contract_multiview(contract, output_dir / "views")
+        if specialized else None
+    )
     manifest = {
         "manifest_version": "1.0",
         "engine": "openscad",
+        "generator_mode": resolved_generator_mode,
+        "generator_version": GENERATOR_VERSION if specialized else "legacy-1.0",
         "units": "mm",
         "coordinate_system": design_state.get("coordinate_system"),
         "design_id": design_state.get("design_id"),
@@ -248,12 +309,24 @@ def generate_openscad(
             }
             for index, part in enumerate(parts)
         ],
+        "requirement_coverage": contract.get("requirement_coverage"),
+        "relationships": contract.get("relationships", []),
+        "hard_constraints": contract.get("hard_constraints", []),
+        "contract_sha256": contract.get("contract_sha256"),
+        "deterministic_seed": contract.get("deterministic_seed"),
+        "partial_regeneration": contract.get("partial_regeneration"),
+        "multiview_validation": multiview_validation,
         "files": {
             "scad": scad_path.name,
             "stl": stl_path.name,
             "glb": glb_path.name,
             "preview": preview_path.name,
             "geometry_json": geometry_json_path.name,
+            "multiview_report": "multiview_validation.json" if specialized else None,
+            "views": {
+                view_name: f"views/{view_name}.png"
+                for view_name in ("front", "top", "right")
+            } if specialized else {},
         },
     }
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")

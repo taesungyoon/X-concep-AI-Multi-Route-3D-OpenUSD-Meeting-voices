@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from io import BytesIO
+import json
 
 from PIL import Image
 
@@ -96,6 +97,75 @@ def test_flux2_workflow_supports_optional_reference(tmp_path):
     assert workflow["10"]["inputs"]["positive"] == ["17", 0]
     assert workflow["10"]["inputs"]["negative"] == ["18", 0]
     assert workflow["13"]["class_type"] == "SaveImage"
+
+
+def test_structured_multi_object_request_uses_precision_route(tmp_path, monkeypatch):
+    settings = replace(
+        get_settings(), storage_path=tmp_path, openai_image_mode="comfyui",
+        image_concept_count=1, image_min_width=32, image_min_height=32,
+        image_min_file_bytes=1, image_min_channel_stddev=0,
+    )
+    client = GPTImageClient(settings)
+    prompts = []
+    monkeypatch.setattr(
+        client, "_call_comfyui",
+        lambda prompt, *_args: prompts.append(prompt) or _png_bytes(),
+    )
+    analysis = {
+        "image_task": "position",
+        "image_requirements": [
+            {"class": "motor", "count": 1},
+            {"class": "sensor", "count": 1, "position": ["above", 0]},
+        ],
+        "concept_variants": [{"name": "정밀 배치", "image_prompt": "sensor above motor"}],
+    }
+
+    results = client.generate_concepts("PRJ-PRECISION", "배치", "equipment", [], analysis)
+
+    assert results[0]["route"] == "precision"
+    assert "exactly 2 required object instances" in prompts[0]
+    assert "Generate one product only" not in prompts[0]
+    manifest = json.loads((tmp_path / "projects" / "PRJ-PRECISION" / "concept_generation_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["concepts"][0]["route"] == "precision"
+
+
+def test_semantic_verifier_uses_same_seed_raw_fallback(tmp_path, monkeypatch):
+    settings = replace(
+        get_settings(), storage_path=tmp_path, openai_image_mode="comfyui",
+        image_concept_count=1, image_min_width=32, image_min_height=32,
+        image_min_file_bytes=1, image_min_channel_stddev=0,
+        image_semantic_verifier_url="http://127.0.0.1:8191",
+    )
+    client = GPTImageClient(settings)
+    calls = []
+
+    def fake_generate(prompt, _reference, _project_id, _index, noise_seed=None):
+        calls.append((prompt, noise_seed))
+        return _png_bytes()
+
+    verdicts = iter([
+        {"passed": False, "evaluator": "fixture", "reasons": ["missing object"]},
+        {"passed": True, "evaluator": "fixture", "reasons": []},
+    ])
+    monkeypatch.setattr(client, "_call_comfyui", fake_generate)
+    monkeypatch.setattr(client, "_verify_semantics", lambda *_args: next(verdicts))
+    analysis = {
+        "image_task": "position",
+        "image_requirements": [
+            {"class": "motor", "count": 1},
+            {"class": "sensor", "count": 1, "position": ["above", 0]},
+        ],
+        "concept_variants": [{"name": "fallback", "image_prompt": "sensor above motor"}],
+    }
+
+    results = client.generate_concepts("PRJ-FALLBACK", "배치", "equipment", [], analysis)
+
+    assert results[0]["requested_route"] == "precision"
+    assert results[0]["route"] == "raw"
+    assert results[0]["semantic_verification"]["selection_reason"] == "precision_failed_raw_verified"
+    assert len(calls) == 2
+    assert calls[0][1] == calls[1][1]
+    assert calls[0][0] != calls[1][0]
 
 
 def test_generated_image_quality_failure_is_not_persisted(tmp_path, monkeypatch):

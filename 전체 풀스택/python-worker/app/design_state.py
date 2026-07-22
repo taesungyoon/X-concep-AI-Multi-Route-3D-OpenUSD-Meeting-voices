@@ -5,6 +5,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
+from .parametric_generators import build_design_spec
+
 DEFAULT_COMPONENTS = {
     "equipment": ["base_frame", "work_unit", "drive_unit", "control_box", "safety_cover"],
     "module": ["base_plate", "drive_unit", "working_jig", "sensor_mount"],
@@ -202,4 +204,10 @@ def build_design_state(
         "validation_grade": "concept",
         "validation_scope": ["concept_review"],
     }
+    design_spec = build_design_spec(state, category)
+    state["design_spec"] = design_spec
+    state["features"] = design_spec["features"]
+    state["relationships"] = design_spec["relationships"]
+    state["hard_constraints"] = design_spec["hard_constraints"]
+    state["analysis_confidence"] = design_spec["confidence"]
     return state

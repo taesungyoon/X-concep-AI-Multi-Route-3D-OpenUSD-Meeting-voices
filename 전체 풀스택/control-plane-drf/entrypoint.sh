@@ -10,7 +10,9 @@ until python manage.py shell -c "from django.db import connection; c=connection.
   fi
   sleep 2
 done
-python manage.py migrate --noinput
-python manage.py bootstrap_internal_auth
-python manage.py collectstatic --noinput || true
+if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
+  python manage.py migrate --noinput
+  python manage.py bootstrap_internal_auth
+  python manage.py collectstatic --noinput || true
+fi
 exec "$@"

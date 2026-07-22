@@ -5,10 +5,10 @@ ARG INSTALL_SPEECH=false
 ARG INSTALL_NEMO_SPEECH=false
 ARG INSTALL_OPENSCAD=false
 ARG INSTALL_BLENDER=false
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg libgl1 libglib2.0-0 ca-certificates \
- && if [ "$INSTALL_OPENSCAD" = "true" ]; then apt-get install -y --no-install-recommends openscad; fi \
- && if [ "$INSTALL_BLENDER" = "true" ]; then apt-get install -y --no-install-recommends blender; fi \
+RUN apt-get -o Acquire::Retries=3 update \
+ && apt-get -o Acquire::Retries=3 install -y --no-install-recommends ffmpeg libgl1 libglib2.0-0 ca-certificates fonts-nanum \
+ && if [ "$INSTALL_OPENSCAD" = "true" ]; then apt-get -o Acquire::Retries=3 install -y --no-install-recommends openscad; fi \
+ && if [ "$INSTALL_BLENDER" = "true" ]; then apt-get -o Acquire::Retries=3 install -y --no-install-recommends blender python3-numpy; fi \
  && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt requirements-openusd.txt requirements-speech.txt requirements-nemo-speech.txt ./
 RUN pip install --no-cache-dir -r requirements.txt \

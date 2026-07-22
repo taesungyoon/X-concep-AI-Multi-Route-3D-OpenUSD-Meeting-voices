@@ -17,11 +17,20 @@ FONT_BOLD = Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc")
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    path = FONT_BOLD if bold and FONT_BOLD.exists() else FONT_REGULAR
-    try:
-        return ImageFont.truetype(str(path), size=size)
-    except OSError:
-        return ImageFont.load_default()
+    candidates = [
+        FONT_BOLD if bold else FONT_REGULAR,
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+        FONT_REGULAR,
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            return ImageFont.truetype(str(path), size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
 def project_dir(project_id: str) -> Path:
@@ -281,8 +290,9 @@ def _render_isometric(path: Path, parts: Iterable[Part], prompt: str) -> None:
     draw.rounded_rectangle(scene_rect, radius=20, fill="#06131e", outline="#17394e")
     _draw_iso_grid(draw, scene_rect)
 
+    render_parts = _fit_parts_for_preview(list(parts))
     polygons = []
-    for part in parts:
+    for part in render_parts:
         polygons.extend(_box_polygons(part, scene_rect))
     polygons.sort(key=lambda item: item[0])
     for _, points, fill, outline in polygons:
@@ -290,6 +300,31 @@ def _render_isometric(path: Path, parts: Iterable[Part], prompt: str) -> None:
     draw.text((76, height - 127), textwrap.shorten(prompt.replace("\n", " "), width=98, placeholder=" …"), font=font(15), fill="#a9becb")
     draw.text((76, height - 89), "실제 서비스 연결 시 선택된 2D 이미지와 생성 모델 API 결과를 표시함", font=font(12), fill="#607d90")
     image.save(path, quality=95)
+
+
+def _fit_parts_for_preview(parts: list[Part]) -> list[Part]:
+    if not parts:
+        return []
+    minimum = [min(part.center[axis] - part.size[axis] / 2 for part in parts) for axis in range(3)]
+    maximum = [max(part.center[axis] + part.size[axis] / 2 for part in parts) for axis in range(3)]
+    span = [maximum[axis] - minimum[axis] for axis in range(3)]
+    fit_scale = 5.4 / max(max(span), 1e-9)
+    center_x = (minimum[0] + maximum[0]) / 2
+    center_y = (minimum[1] + maximum[1]) / 2
+    base_z = minimum[2]
+    return [
+        Part(
+            part.name,
+            tuple(value * fit_scale for value in part.size),
+            (
+                (part.center[0] - center_x) * fit_scale,
+                (part.center[1] - center_y) * fit_scale,
+                (part.center[2] - base_z) * fit_scale,
+            ),
+            part.color,
+        )
+        for part in parts
+    ]
 
 
 def _iso(point: tuple[float, float, float], rect: tuple[int, int, int, int]) -> tuple[int, int]:

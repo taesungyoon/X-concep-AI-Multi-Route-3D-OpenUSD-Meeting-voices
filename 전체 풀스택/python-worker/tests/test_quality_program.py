@@ -3,10 +3,12 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
+from PIL import Image
 
 
 STACK_ROOT = Path(__file__).resolve().parents[2]
@@ -107,6 +109,9 @@ def test_semantic_report_is_bound_to_dataset_model_and_images(tmp_path):
             "toolchain_id": "owlvit-geneval-evaluator",
             "evaluator": "owlvit-geneval-compatible-v1",
             "official_geneval_score": False,
+            "detection_threshold": 0.3,
+            "nms_iou_threshold": 0.3,
+            "text_threshold": 0.3,
         },
     }
     tier = {"semantic_score_required": True, "semantic_min_result_count": 1}
@@ -120,6 +125,7 @@ def test_semantic_report_is_bound_to_dataset_model_and_images(tmp_path):
         "dataset_revision": "dataset-revision",
         "dataset_source_sha256": "dataset-sha",
         "image_manifest_sha256": runner.sha256_file(image_manifest),
+        "thresholds": {"detection": 0.3, "nms_iou": 0.3, "text": 0.3},
         "case_count": 1,
         "correct_count": 1,
         "overall_score_pct": 100.0,
@@ -141,3 +147,25 @@ def test_semantic_report_is_bound_to_dataset_model_and_images(tmp_path):
     image_path.write_bytes(b"tampered")
     checks = runner._evaluate_semantic_report(manifest, dataset_root, lock_map, gates, tier, image_manifest, report_path)
     assert checks[0]["status"] == "failed"
+
+
+def test_image_benchmark_quality_and_pool_are_tier_invariant():
+    benchmark = _load("quality_image_benchmark", "benchmark-local-images.py")
+    selected = benchmark._deterministic_indices(1632, 256, 20260721, "parti-prompts")
+    full_rows = [{"row_index": index} for index in range(1632)]
+    standard_rows = [{"row_index": index} for index in selected]
+    assert benchmark._canonical_pool(full_rows, 1632, 20260721, "parti-prompts") == standard_rows
+    assert benchmark._canonical_pool(standard_rows, 1632, 20260721, "parti-prompts") == standard_rows
+
+    thresholds = {
+        "image_min_width": 512,
+        "image_min_height": 512,
+        "image_min_bytes": 100,
+        "image_min_entropy": 3.0,
+    }
+    low = BytesIO()
+    Image.new("RGB", (512, 512), "black").save(low, format="PNG")
+    high = BytesIO()
+    Image.linear_gradient("L").resize((512, 512)).convert("RGB").save(high, format="PNG")
+    assert benchmark._gate_quality(low.getvalue(), thresholds)["passed"] is False
+    assert benchmark._gate_quality(high.getvalue(), thresholds)["passed"] is True

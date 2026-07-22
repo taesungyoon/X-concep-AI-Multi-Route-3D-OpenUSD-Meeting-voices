@@ -286,6 +286,8 @@ def main() -> int:
     parser.add_argument("--text-threshold", type=float, default=0.30)
     parser.add_argument("--color-threshold", type=float, default=0.08)
     parser.add_argument("--minimum-score", type=float, default=0.8)
+    parser.add_argument("--prompt-mode", choices=("raw", "rewritten", "precision"))
+    parser.add_argument("--split", choices=("calibration", "holdout"))
     args = parser.parse_args()
 
     dataset_root = args.dataset_root.resolve()
@@ -297,6 +299,10 @@ def main() -> int:
     metadata_rows = _read_jsonl(source_path)
     metadata = {index: row for index, row in enumerate(metadata_rows)}
     image_rows = [row for row in _read_jsonl(image_manifest) if row.get("dataset") == "geneval"]
+    if args.prompt_mode:
+        image_rows = [row for row in image_rows if row.get("prompt_mode", "raw") == args.prompt_mode]
+    if args.split:
+        image_rows = [row for row in image_rows if row.get("split") == args.split]
     if not image_rows:
         raise SystemExit("No GenEval rows were found in the image manifest")
 
@@ -372,6 +378,10 @@ def main() -> int:
             "tag": row_metadata.get("tag"),
             "prompt_sha256": hashlib.sha256(str(row_metadata.get("prompt", "")).encode("utf-8")).hexdigest(),
             "image_sha256": sha256_file(image_path),
+            "benchmark_seed": image_row.get("benchmark_seed"),
+            "seed": image_row.get("seed"),
+            "prompt_mode": image_row.get("prompt_mode", "raw"),
+            "split": image_row.get("split"),
             "correct": correct,
             "reasons": reasons,
             "detail": detail,
@@ -402,6 +412,8 @@ def main() -> int:
         "dataset_revision": geneval_entry["revision"],
         "dataset_source_sha256": geneval_entry["artifacts"][0]["sha256"],
         "image_manifest_sha256": sha256_file(image_manifest),
+        "prompt_mode": args.prompt_mode,
+        "split": args.split,
         "thresholds": {
             "detection": detection_threshold,
             "nms_iou": args.nms_threshold,

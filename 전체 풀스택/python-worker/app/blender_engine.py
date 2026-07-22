@@ -68,10 +68,28 @@ for idx,obj in enumerate(objects):
     mat=bpy.data.materials.new(name=f"XconcepMaterial_{{idx}}")
     mat.use_nodes=True
     bsdf=mat.node_tree.nodes.get("Principled BSDF")
-    palette=[(0.04,0.24,0.68,1),(0.025,0.03,0.04,1),(0.42,0.45,0.47,1)]
-    bsdf.inputs["Base Color"].default_value=palette[idx%len(palette)]
-    bsdf.inputs["Metallic"].default_value=0.62 if idx%3==2 else 0.22
-    bsdf.inputs["Roughness"].default_value=0.24 if idx%3==0 else 0.34
+    name=obj.name.lower()
+    if "safety_door" in name:
+        color,metallic,roughness=(0.12,0.55,0.72,0.26),0.0,0.12
+    elif "frame" in name or "gantry" in name:
+        color,metallic,roughness=(0.34,0.39,0.43,1.0),0.88,0.24
+    elif "servo" in name or "camera" in name or "sensor" in name:
+        color,metallic,roughness=(0.018,0.025,0.035,1.0),0.15,0.30
+    elif "conveyor" in name or "guide" in name:
+        color,metallic,roughness=(0.04,0.20,0.42,1.0),0.48,0.28
+    elif "control_panel" in name:
+        color,metallic,roughness=(0.22,0.25,0.28,1.0),0.58,0.31
+    else:
+        color,metallic,roughness=(0.08,0.30,0.58,1.0),0.30,0.32
+    bsdf.inputs["Base Color"].default_value=color
+    bsdf.inputs["Metallic"].default_value=metallic
+    bsdf.inputs["Roughness"].default_value=roughness
+    if color[3] < 1.0:
+        bsdf.inputs["Alpha"].default_value=color[3]
+        try: mat.surface_render_method='DITHERED'
+        except Exception:
+            try: mat.blend_method='BLEND'
+            except Exception: pass
     obj.data.materials.clear(); obj.data.materials.append(mat)
     bevel=obj.modifiers.new(name="Manufacturing Edge",type='BEVEL')
     bevel.width=max(min(obj.dimensions)*0.008,0.00025); bevel.segments=3; bevel.limit_method='ANGLE'
@@ -91,7 +109,7 @@ bsdf=mat.node_tree.nodes.get("Principled BSDF"); bsdf.inputs["Base Color"].defau
 plane.data.materials.append(mat)
 bpy.ops.object.camera_add(location=(center.x+size*2.2,center.y-size*2.2,center.z+size*1.45))
 cam=bpy.context.object; bpy.context.scene.camera=cam; look_at(cam,center)
-for loc,energy,area,temp in [((3,-4,5),1700,3.5,0),((-3,-1,2.5),900,2.8,0),((0,4,4),1200,2.4,0)]:
+for loc,energy,area,temp in [((3,-4,5),850,3.5,0),((-3,-1,2.5),420,2.8,0),((0,4,4),560,2.4,0)]:
     bpy.ops.object.light_add(type='AREA',location=(center.x+loc[0]*size/4,center.y+loc[1]*size/4,center.z+loc[2]*size/4))
     light=bpy.context.object; light.data.energy=energy; light.data.shape='DISK'; light.data.size=max(area*size/4,.2); look_at(light,center)
 scene=bpy.context.scene
@@ -101,6 +119,9 @@ except TypeError:
     scene.render.engine='BLENDER_EEVEE'
 scene.render.resolution_x=1280; scene.render.resolution_y=860; scene.render.resolution_percentage=100
 scene.render.image_settings.file_format='PNG'; scene.render.filepath={str(output_png)!r}
+scene.view_settings.exposure=-0.8
+try: scene.view_settings.look='AgX - Medium High Contrast'
+except Exception: pass
 if scene.world is None: scene.world=bpy.data.worlds.new("Xconcep World")
 scene.world.color=(0.01,0.015,0.025)
 scene.render.film_transparent=False
@@ -111,7 +132,10 @@ for obj in objects: obj.select_set(True)
 bpy.context.view_layer.objects.active=objects[0]
 bpy.ops.export_scene.gltf(filepath={str(output_glb)!r},export_format='GLB',export_apply=True,use_selection=True)
 try:
-    bpy.ops.wm.usd_export(filepath={str(output_usd)!r},export_materials=True,export_textures=True,selected_objects_only=True)
+    try:
+        bpy.ops.wm.usd_export(filepath={str(output_usd)!r},export_materials=True,export_textures=True,selected_objects_only=True)
+    except TypeError:
+        bpy.ops.wm.usd_export(filepath={str(output_usd)!r},export_materials=True,selected_objects_only=True)
 except Exception as exc:
     print("USD_EXPORT_WARNING",exc)
 bpy.ops.render.render(write_still=True)

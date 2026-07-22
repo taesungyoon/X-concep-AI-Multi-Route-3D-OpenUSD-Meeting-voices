@@ -46,6 +46,8 @@ class Settings:
     image_min_file_bytes: int
     image_min_channel_stddev: float
     image_require_expected_aspect: bool
+    image_semantic_verifier_url: str
+    image_semantic_verifier_timeout_seconds: int
     hunyuan_mode: str
     shape_provider: str
     hunyuan_api_url: str
@@ -150,6 +152,8 @@ def get_settings() -> Settings:
         image_min_file_bytes=max(1, int(os.getenv("IMAGE_MIN_FILE_BYTES", "10000"))),
         image_min_channel_stddev=max(0.0, float(os.getenv("IMAGE_MIN_CHANNEL_STDDEV", "3.0"))),
         image_require_expected_aspect=_bool("IMAGE_REQUIRE_EXPECTED_ASPECT", True),
+        image_semantic_verifier_url=os.getenv("IMAGE_SEMANTIC_VERIFIER_URL", "").rstrip("/"),
+        image_semantic_verifier_timeout_seconds=max(1, int(os.getenv("IMAGE_SEMANTIC_VERIFIER_TIMEOUT_SECONDS", "120"))),
         hunyuan_mode=os.getenv("SHAPE_MODE", os.getenv("HUNYUAN_MODE", "triposr")).strip().lower(),
         shape_provider=os.getenv("SHAPE_PROVIDER", "triposr").strip().lower(),
         hunyuan_api_url=os.getenv("SHAPE_API_URL", os.getenv("HUNYUAN_API_URL", "http://127.0.0.1:8081")).rstrip("/"),

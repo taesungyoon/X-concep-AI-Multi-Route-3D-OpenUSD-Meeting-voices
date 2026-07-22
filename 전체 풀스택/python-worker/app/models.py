@@ -6,7 +6,16 @@ from pydantic import BaseModel, Field
 
 OutputGoal = Literal["auto", "fast", "structural", "high_quality", "motion_openusd"]
 QualityProfile = Literal["preview", "standard", "final"]
-EngineOverride = Literal["hunyuan3d", "openscad", "blender", "hybrid"]
+EngineOverride = Literal[
+    "hunyuan3d",
+    "openscad",
+    "openscad_auto",
+    "openscad_part",
+    "openscad_module",
+    "openscad_equipment",
+    "blender",
+    "hybrid",
+]
 ValidationGrade = Literal[
     "concept",
     "structured",
@@ -37,6 +46,9 @@ class Generate3DRequest(BaseModel):
     quality_profile: QualityProfile = "standard"
     engine_override: EngineOverride | None = None
     previous_design_state: dict[str, Any] | None = None
+    previous_geometry_contract: dict[str, Any] | None = None
+    regeneration_scope: list[str] = Field(default_factory=list, max_length=32)
+    regeneration_reason: str = Field(default="", max_length=500)
 
 
 class ReviewGradeRequest(BaseModel):

@@ -17,12 +17,12 @@ def generate_2d_task(job_id, asset_ids=None, meeting_analysis=None):
 
 
 @shared_task(name='xconcep.generate_3d')
-def generate_3d_task(job_id, concept_pk, output_goal, quality_profile, engine_override=None):
+def generate_3d_task(job_id, concept_pk, output_goal, quality_profile, engine_override=None, regeneration_scope=None, regeneration_reason=''):
     from .models import Concept2D, GenerationJob
     from . import services
 
     job=GenerationJob.objects.select_related('project').get(pk=job_id)
     selected=Concept2D.objects.get(pk=concept_pk,project=job.project)
     return services.generate_3d(
-        job.project,selected,output_goal,quality_profile,engine_override,job=job,
+        job.project,selected,output_goal,quality_profile,engine_override,regeneration_scope,regeneration_reason,job=job,
     )

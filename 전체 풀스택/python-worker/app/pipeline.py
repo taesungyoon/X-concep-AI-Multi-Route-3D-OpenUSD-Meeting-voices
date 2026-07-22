@@ -21,6 +21,11 @@ from .models import Generate2DRequest, Generate3DRequest, MeetingAnalyzeRequest,
 from .openai_image_client import GPTImageClient
 from .openscad_engine import generate_openscad
 from .openusd_exporter import export_openusd, validate_usda
+from .parametric_generators import (
+    SPECIALIZED_MODES,
+    apply_partial_regeneration,
+    build_geometry_contract,
+)
 from .quality_gate import validate_asset
 from .renderer import create_preview
 from .settings import Settings
@@ -64,7 +69,10 @@ class GenerationPipeline:
                     else "mock"
                 ),
                 "external_services": ["OpenAI Image API"] if self.settings.openai_image_mode == "openai" else [],
-                "available_3d_routes": ["hunyuan3d", "openscad", "blender", "hybrid"],
+                "available_3d_routes": [
+                    "hunyuan3d", "openscad", "openscad_auto", "openscad_part",
+                    "openscad_module", "openscad_equipment", "blender", "hybrid",
+                ],
             },
         }
 
@@ -107,7 +115,31 @@ class GenerationPipeline:
             source_glbs.append(Path(hunyuan_asset["absolute_paths"]["glb"]))
 
         if route in {"openscad", "hybrid"} or "openscad" in plan.get("secondary_routes", []):
-            openscad_asset = self._generate_openscad(request, design_state, result_root / "structural")
+            generator_mode = str(plan.get("generator_mode") or "openscad")
+            geometry_contract: dict[str, Any] | None = None
+            if generator_mode in SPECIALIZED_MODES:
+                candidate_contract = build_geometry_contract(
+                    design_state,
+                    request.category,
+                    generator_mode,
+                )
+                if request.regeneration_scope:
+                    if not request.previous_geometry_contract:
+                        raise ValueError("부분 재생성에 필요한 기존 GeometryContract가 없음")
+                    geometry_contract = apply_partial_regeneration(
+                        request.previous_geometry_contract,
+                        candidate_contract,
+                        request.regeneration_scope,
+                    )
+                else:
+                    geometry_contract = candidate_contract
+            openscad_asset = self._generate_openscad(
+                request,
+                design_state,
+                result_root / "structural",
+                generator_mode=generator_mode,
+                geometry_contract=geometry_contract,
+            )
             source_assets.append(openscad_asset)
             source_glbs.append(Path(openscad_asset["absolute_paths"]["glb"]))
 
@@ -132,6 +164,7 @@ class GenerationPipeline:
                 active_asset = next(item for item in source_assets if item["route_key"] == "fast")
 
         openusd_required = "openusd" in plan.get("postprocess", []) or request.output_goal == "motion_openusd"
+        structural_asset = next((item for item in source_assets if item.get("route_key") == "structural"), None)
         active_glb = Path(active_asset["absolute_paths"]["glb"])
         manifest_path = Path(active_asset["absolute_paths"]["manifest"]) if active_asset["absolute_paths"].get("manifest") else None
         validation = validate_asset(
@@ -142,15 +175,27 @@ class GenerationPipeline:
             dimension_tolerance_pct=self.settings.validation_dimension_tolerance_pct,
             blender_processed=active_asset["route_key"] == "high_quality",
         )
+        if structural_asset and validation.get("multiview"):
+            view_urls = structural_asset.get("validation_views") or {}
+            for view_name, view in (validation["multiview"].get("views") or {}).items():
+                if view_name in view_urls:
+                    view["url"] = view_urls[view_name]
+            validation["multiview"]["report_url"] = structural_asset.get("multiview_report_url")
         design_state["validation_grade"] = validation["grade"]
         design_state["validation_scope"] = validation["usage_scope"]
         (project_dir / "design_state.json").write_text(json.dumps(design_state, ensure_ascii=False, indent=2), encoding="utf-8")
         (result_root / "validation_report.json").write_text(json.dumps(validation, ensure_ascii=False, indent=2), encoding="utf-8")
+        assembly_contract: dict[str, Any] = {}
+        if structural_asset:
+            geometry_path = structural_asset.get("absolute_paths", {}).get("geometry_json")
+            if geometry_path:
+                assembly_contract = self._load_json(Path(str(geometry_path)))
         openusd = self._package_openusd(
             request=request,
             design_state=design_state,
             plan=plan,
             active_asset=active_asset,
+            assembly_contract=assembly_contract,
             output_dir=result_root,
             required=openusd_required,
         )
@@ -172,6 +217,11 @@ class GenerationPipeline:
             "assets": assets_by_key,
             "design_state": design_state,
             "generation_plan": plan,
+            "generator_mode": plan.get("generator_mode"),
+            "geometry_contract": assembly_contract,
+            "partial_regeneration": assembly_contract.get("partial_regeneration"),
+            "validation_views": (structural_asset or {}).get("validation_views") or {},
+            "multiview_report_url": (structural_asset or {}).get("multiview_report_url"),
             "validation": validation,
             "validation_grade": validation["grade"],
             "validation_grade_label": validation["grade_label"],
@@ -231,7 +281,15 @@ class GenerationPipeline:
             "absolute_paths": {"glb": str(glb_path), "stl": str(stl_path), "preview": str(preview_path)},
         }
 
-    def _generate_openscad(self, request: Generate3DRequest, design_state: dict[str, Any], output_dir: Path) -> dict[str, Any]:
+    def _generate_openscad(
+        self,
+        request: Generate3DRequest,
+        design_state: dict[str, Any],
+        output_dir: Path,
+        *,
+        generator_mode: str,
+        geometry_contract: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         generated = generate_openscad(
             design_state=design_state,
             category=request.category,
@@ -239,22 +297,40 @@ class GenerationPipeline:
             openscad_bin=self.settings.openscad_bin,
             timeout_seconds=self.settings.openscad_timeout_seconds,
             mode=self.settings.openscad_mode,
+            generator_mode=generator_mode,
+            geometry_contract=geometry_contract,
         )
+        labels = {
+            "openscad": "범용 OpenSCAD 구조 3D",
+            "openscad_part": "부품 파라메트릭 3D",
+            "openscad_module": "모듈 파라메트릭 3D",
+            "openscad_equipment": "설비 파라메트릭 3D",
+        }
         return {
             "route_key": "structural",
-            "title": "치수·구조 기반 3D",
+            "title": labels.get(generator_mode, "치수·구조 기반 3D"),
             "glb_url": self._public_url(request.project_id, "result/structural/model_structural.glb"),
             "stl_url": self._public_url(request.project_id, "result/structural/model_structural.stl"),
             "preview_url": self._public_url(request.project_id, "result/structural/render_structural.png"),
             "scad_url": self._public_url(request.project_id, "result/structural/model.scad"),
             "geometry_json_url": self._public_url(request.project_id, "result/structural/geometry.json"),
             "manifest_url": self._public_url(request.project_id, "result/structural/assembly_manifest.json"),
-            "tags": ["구조 중심 3D", "OpenSCAD", "Parametric", "SCAD", "STL"],
+            "multiview_report_url": self._public_url(request.project_id, "result/structural/multiview_validation.json"),
+            "validation_views": {
+                view_name: self._public_url(request.project_id, f"result/structural/views/{view_name}.png")
+                for view_name in ("front", "top", "right")
+            } if generator_mode in SPECIALIZED_MODES else {},
+            "tags": ["구조 중심 3D", "OpenSCAD", generator_mode, "Parametric", "SCAD", "STL"],
+            "generator_mode": generator_mode,
             "provider": generated.provider,
             "usage_scope": ["구조·배치 검토", "초기 엔지니어링", "후속 CAD 입력"],
             "absolute_paths": {
                 "glb": str(generated.glb_path), "stl": str(generated.stl_path), "preview": str(generated.preview_path),
                 "scad": str(generated.scad_path), "manifest": str(generated.manifest_path), "geometry_json": str(generated.geometry_json_path),
+                "multiview_report": str(output_dir / "multiview_validation.json") if generator_mode in SPECIALIZED_MODES else None,
+                "view_front": str(output_dir / "views" / "front.png") if generator_mode in SPECIALIZED_MODES else None,
+                "view_top": str(output_dir / "views" / "top.png") if generator_mode in SPECIALIZED_MODES else None,
+                "view_right": str(output_dir / "views" / "right.png") if generator_mode in SPECIALIZED_MODES else None,
             },
         }
 
@@ -307,6 +383,7 @@ class GenerationPipeline:
         design_state: dict[str, Any],
         plan: dict[str, Any],
         active_asset: dict[str, Any],
+        assembly_contract: dict[str, Any],
         output_dir: Path,
         required: bool,
     ) -> dict[str, Any] | None:
@@ -321,7 +398,9 @@ class GenerationPipeline:
                 "selected_concept_id": request.selected_2d_id,
                 "design_id": design_state.get("design_id"),
                 "generation_route": plan.get("primary_route"),
+                "generator_mode": plan.get("generator_mode"),
                 "validation_grade": design_state.get("validation_grade", "concept"),
+                "geometry_contract": assembly_contract,
             },
             generate_usdc=self.settings.openusd_generate_usdc,
             meeting_analysis=request.meeting_analysis,

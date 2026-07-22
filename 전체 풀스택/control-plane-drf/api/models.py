@@ -75,3 +75,26 @@ class GenerationJob(models.Model):
     error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class QualityEvidence(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    suite = models.CharField(max_length=80)
+    run_id = models.CharField(max_length=120)
+    passed = models.BooleanField()
+    score_pct = models.FloatField(blank=True, null=True)
+    target_pct = models.FloatField(default=95.0)
+    evaluator = models.CharField(max_length=160, blank=True)
+    model_name = models.CharField(max_length=255, blank=True)
+    report_path = models.CharField(max_length=1000)
+    report_sha256 = models.CharField(max_length=64)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['suite', 'report_sha256'], name='quality_evidence_suite_sha_uniq'),
+        ]
+        indexes = [
+            models.Index(fields=['suite', '-created_at'], name='quality_suite_created_idx'),
+        ]

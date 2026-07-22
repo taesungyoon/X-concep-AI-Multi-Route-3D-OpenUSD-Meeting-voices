@@ -563,11 +563,23 @@ function renderValidation(validation) {
   const grade = validation.grade_label || state.project.validation_grade || '컨셉 검토 가능';
   const score = Math.max(0, Math.min(1, Number(validation.score || 0)));
   qs('#validationGrade').textContent = grade;
-  qs('#validationScoreBar').style.width = `${Math.round(score * 100)}%`;
+  qs('#validationScoreBar').style.width = Math.round(score * 100) + '%';
   qs('#validationScope').textContent = (validation.usage_scope || ['생성 결과 검토']).join(' · ');
   const details = qs('#validationDetails');
-  details.innerHTML = (validation.checks || []).map(check => `<div class="validation-check ${check.passed ? 'pass' : 'fail'}"><span>${escapeHtml(check.label || check.id)}</span><b>${check.passed ? 'PASS' : 'CHECK'}</b></div>`).join('') +
-    `<p>${escapeHtml(validation.manufacturing_note || '')}</p>`;
+  const multiview = validation.multiview || {};
+  const viewHtml = Object.entries(multiview.views || {}).map(([name, view]) => {
+    const url = safeAssetUrl(view.url || '');
+    if (!url) return '';
+    return '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener"><img src="' + escapeHtml(url) + '" alt="' + escapeHtml(name) + ' 검증 시점"><span>' + escapeHtml(name.toUpperCase()) + '</span></a>';
+  }).join('');
+  details.innerHTML = (validation.checks || []).map(check => '<div class="validation-check ' + (check.passed ? 'pass' : 'fail') + '"><span>' + escapeHtml(check.label || check.id) + '</span><b>' + (check.passed ? 'PASS' : 'CHECK') + '</b></div>').join('') +
+    (viewHtml ? '<div class="validation-view-grid">' + viewHtml + '</div>' : '') +
+    '<p>' + escapeHtml(validation.manufacturing_note || '') + '</p>';
+  const partialButton = qs('#partialRegenerateButton');
+  const scopes = validation.regeneration_plan?.scopes || [];
+  partialButton.hidden = scopes.length === 0;
+  partialButton.dataset.scopes = JSON.stringify(scopes);
+  partialButton.textContent = scopes.length ? '실패 항목 ' + scopes.length + '개만 재생성' : '실패 항목만 재생성';
 }
 
 async function regenerateWithGoal(goal) {
@@ -578,7 +590,8 @@ async function regenerateWithGoal(goal) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
         selected_2d_id: state.project.selected_2d_id,
         output_goal: goal,
-        quality_profile: goal === 'high_quality' || goal === 'motion_openusd' ? 'final' : 'standard'
+        quality_profile: goal === 'high_quality' || goal === 'motion_openusd' ? 'final' : 'standard',
+        engine_override: selectedEngineOverride() || state.project.result_3d?.generator_mode || null
       })
     });
     const json = await response.json();
@@ -589,12 +602,37 @@ async function regenerateWithGoal(goal) {
   finally { stopLoading(); }
 }
 
+async function regenerateFailedScopes() {
+  const button = qs('#partialRegenerateButton');
+  const scopes = JSON.parse(button.dataset.scopes || '[]');
+  if (!state.project || !state.project.selected_2d_id || !scopes.length) return;
+  startLoading('3d');
+  try {
+    const response = await fetch('/api/projects/' + state.project.id + '/generate-3d', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        selected_2d_id: state.project.selected_2d_id,
+        output_goal: 'structural',
+        quality_profile: state.project.quality_profile || 'standard',
+        engine_override: selectedEngineOverride() || state.project.result_3d?.generator_mode || null,
+        regeneration_scope: scopes,
+        regeneration_reason: 'multiview_contract_failure'
+      })
+    });
+    const json = await response.json();
+    state.project = await resolveProject(response, json, '부분 재생성 실패');
+    await renderResult();
+    showToast('실패 항목 ' + scopes.length + '개를 부분 재생성함');
+  } catch (error) { showToast(error.message); }
+  finally { stopLoading(); }
+}
+
 qs('#validationDetailsButton').addEventListener('click', () => {
   const details = qs('#validationDetails');
   details.hidden = !details.hidden;
   qs('#validationDetailsButton').textContent = details.hidden ? '검증 상세 보기' : '검증 상세 닫기';
 });
 qsa('[data-regenerate-goal]').forEach(button => button.addEventListener('click', () => regenerateWithGoal(button.dataset.regenerateGoal)));
+qs('#partialRegenerateButton').addEventListener('click', regenerateFailedScopes);
 qs('#editPromptButton').addEventListener('click', () => setStage(1));
 qs('#newProjectButton').addEventListener('click', () => {
   stopMeeting(); updateMeetingBadge('대기', false); qs('#recordTime').textContent = '00:00'; state.project = null; state.selected2d = null; state.files = []; state.meeting.chunks = 0; manualTranscript.value = ''; transcriptStream.innerHTML = '<div class="empty-transcript">회의를 시작하거나 내용을 직접 입력함</div>'; generateMeeting2dButton.disabled = true;
@@ -652,7 +690,7 @@ function escapeHtml(value) { const div = document.createElement('div'); div.text
 function safeAssetUrl(value) {
   const url = String(value || '').trim();
   if (url === '#') return '#';
-  if (/^\/storage\/projects\/[A-Za-z0-9-]+\/(results-2d|result)\/[A-Za-z0-9_./-]+$/.test(url)) return url;
+  if (/^\/storage\/projects\/[A-Za-z0-9-]+\/(concepts|results-2d|result)\/[A-Za-z0-9_./-]+$/.test(url)) return url;
   return '';
 }
 

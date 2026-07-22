@@ -60,8 +60,9 @@ def test_openusd_layered_package_contains_omniverse_capabilities(monkeypatch, tm
     assert payload["capabilities"]["physx_ready"] is True
     assert result["openusd_root_url"].endswith("root.usda")
 
-def test_meeting_fallback_marks_unresolved_dimension(settings):
+def test_meeting_fallback_marks_unresolved_dimension(monkeypatch, tmp_path):
     from app.meeting_analyzer import MeetingAnalyzer
+    settings = build_pipeline(monkeypatch, tmp_path).settings
     result=MeetingAnalyzer(settings).analyze('전체 폭은 900 mm로 변경하고 높이는 다음 회의에서 확정함.', 'equipment')
     assert result['dimensions']['width_mm']==900
     assert any('높이' in item for item in result['unresolved_items'])

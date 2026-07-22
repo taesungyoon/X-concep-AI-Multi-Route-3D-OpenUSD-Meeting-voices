@@ -12,7 +12,27 @@ on:
       - "전체 풀스택/scripts/benchmark-local-images.py"
       - "전체 풀스택/scripts/benchmark-public-cad.py"
       - "전체 풀스택/scripts/score-geneval-owlvit.py"
+      - "전체 풀스택/scripts/quality_metrics.py"
+      - "전체 풀스택/scripts/analyze-evaluation-reliability.py"
+      - "전체 풀스택/scripts/benchmark-image-holdout.py"
+      - "전체 풀스택/scripts/compare-image-ab.py"
+      - "전체 풀스택/scripts/select-image-route.py"
+      - "전체 풀스택/scripts/compare-quality-baseline.py"
+      - "전체 풀스택/python-worker/app/image_precision.py"
+      - "전체 풀스택/python-worker/app/openai_image_client.py"
+      - "전체 풀스택/quality/ci-baseline.json"
       - "전체 풀스택/python-worker/tests/test_quality_program.py"
+      - "전체 풀스택/python-worker/tests/test_quality_advanced.py"
+      - "전체 풀스택/python-worker/tests/test_comfyui_image_client.py"
+      - "전체 풀스택/python-worker/tests/test_image_semantic_seed.py"
+      - "전체 풀스택/scripts/run-image-semantic-verifier.py"
+      - "전체 풀스택/scripts/run-image-semantic-verifier.ps1"
+      - "전체 풀스택/scripts/smoke-image-semantic-routing.py"
+      - "전체 풀스택/quality/advanced-baseline.json"
+      - "전체 풀스택/control-plane-drf/api/models.py"
+      - "전체 풀스택/control-plane-drf/api/migrations/**"
+      - "전체 풀스택/control-plane-drf/api/management/commands/import_quality_evidence.py"
+      - "전체 풀스택/control-plane-drf/api/tests/test_quality_evidence.py"
       - ".github/workflows/quality-program.yml"
   pull_request:
     paths:
@@ -22,7 +42,27 @@ on:
       - "전체 풀스택/scripts/benchmark-local-images.py"
       - "전체 풀스택/scripts/benchmark-public-cad.py"
       - "전체 풀스택/scripts/score-geneval-owlvit.py"
+      - "전체 풀스택/scripts/quality_metrics.py"
+      - "전체 풀스택/scripts/analyze-evaluation-reliability.py"
+      - "전체 풀스택/scripts/benchmark-image-holdout.py"
+      - "전체 풀스택/scripts/compare-image-ab.py"
+      - "전체 풀스택/scripts/select-image-route.py"
+      - "전체 풀스택/scripts/compare-quality-baseline.py"
+      - "전체 풀스택/python-worker/app/image_precision.py"
+      - "전체 풀스택/python-worker/app/openai_image_client.py"
+      - "전체 풀스택/quality/ci-baseline.json"
       - "전체 풀스택/python-worker/tests/test_quality_program.py"
+      - "전체 풀스택/python-worker/tests/test_quality_advanced.py"
+      - "전체 풀스택/python-worker/tests/test_comfyui_image_client.py"
+      - "전체 풀스택/python-worker/tests/test_image_semantic_seed.py"
+      - "전체 풀스택/scripts/run-image-semantic-verifier.py"
+      - "전체 풀스택/scripts/run-image-semantic-verifier.ps1"
+      - "전체 풀스택/scripts/smoke-image-semantic-routing.py"
+      - "전체 풀스택/quality/advanced-baseline.json"
+      - "전체 풀스택/control-plane-drf/api/models.py"
+      - "전체 풀스택/control-plane-drf/api/migrations/**"
+      - "전체 풀스택/control-plane-drf/api/management/commands/import_quality_evidence.py"
+      - "전체 풀스택/control-plane-drf/api/tests/test_quality_evidence.py"
 
 permissions:
   contents: read
@@ -37,16 +77,26 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install pytest Pillow usd-core
+      - run: python -m pip install pytest Pillow usd-core httpx numpy trimesh pydantic pydantic-settings Django==5.2.16 djangorestframework==3.17.1 django-cors-headers==4.7.0
       - name: Unit contracts
         working-directory: 전체 풀스택
-        run: python -m pytest python-worker/tests/test_quality_program.py -q
+        run: python -m pytest python-worker/tests/test_quality_program.py python-worker/tests/test_quality_advanced.py python-worker/tests/test_comfyui_image_client.py python-worker/tests/test_image_semantic_seed.py -q
+      - name: Internal quality evidence schema
+        working-directory: 전체 풀스택/control-plane-drf
+        env:
+          DB_ENGINE: sqlite
+        run: |
+          python manage.py makemigrations --check --dry-run
+          python manage.py test api.tests.test_quality_evidence --verbosity 1
       - name: Sync pinned public fixtures
         working-directory: 전체 풀스택
         run: python scripts/sync-quality-datasets.py --tier smoke
       - name: Run phases 1,2,3,4,6 smoke gates
         working-directory: 전체 풀스택
         run: python scripts/run-quality-program.py --tier smoke
+      - name: Fail on smoke baseline regression
+        working-directory: 전체 풀스택
+        run: python scripts/compare-quality-baseline.py --contract quality/ci-baseline.json
       - name: Upload quality evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,3 +105,4 @@ jobs:
           path: |
             전체 풀스택/storage/quality-datasets/quality-datasets.lock.json
             전체 풀스택/storage/quality-program/**
+            전체 풀스택/storage/quality-results/baseline-diff/**

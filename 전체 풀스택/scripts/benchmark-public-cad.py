@@ -15,6 +15,8 @@ from build123d import Compound
 from OCP.IFSelect import IFSelect_RetDone
 from OCP.STEPControl import STEPControl_Reader
 
+from quality_metrics import step_pmi_semantics
+
 
 STACK_ROOT = Path(__file__).resolve().parents[1]
 
@@ -52,7 +54,9 @@ def _inspect_case(dataset_root: Path, row: dict[str, Any]) -> dict[str, Any]:
         "representation": "tessellated" if "-tg" in path.stem.lower() else "brep",
     }
     try:
-        header = path.read_text(encoding="latin-1", errors="ignore")[:100_000]
+        step_text = path.read_text(encoding="latin-1", errors="ignore")
+        header = step_text[:100_000]
+        pmi = step_pmi_semantics(step_text)
         shape = _import_step_geometry(path)
         bounds = shape.bounding_box()
         size = [float(bounds.size.X), float(bounds.size.Y), float(bounds.size.Z)]
@@ -75,6 +79,8 @@ def _inspect_case(dataset_root: Path, row: dict[str, Any]) -> dict[str, Any]:
             "positive_extents": all(value > 0 for value in size),
             "solid_or_tessellated": is_tessellated or solid_count > 0,
             "positive_volume_or_tessellated": is_tessellated or (math.isfinite(volume) and volume > 0),
+            "step_references_resolve": pmi["unresolved_reference_count"] == 0,
+            "semantic_pmi_present": pmi["semantic_pmi_entity_count"] > 0,
         }
         result.update(
             {
@@ -90,6 +96,7 @@ def _inspect_case(dataset_root: Path, row: dict[str, Any]) -> dict[str, Any]:
                     "bounds_min_mm": minimum,
                     "bounds_max_mm": maximum,
                     "size_mm": size,
+                    "pmi": pmi,
                 },
             }
         )

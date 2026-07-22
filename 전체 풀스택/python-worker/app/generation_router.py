@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .parametric_generators import GENERIC_MODE, is_openscad_mode, resolve_generator_mode
+
 FREEFORM_TERMS = {
     "곡면", "유기적", "인체공학", "손잡이", "그립", "외장", "커버", "하우징", "shell", "ergonomic", "freeform", "organic"
 }
@@ -63,12 +65,21 @@ def plan_generation(
         reasons.append("동작·OpenUSD·Omniverse 출력이 필요함")
 
     force_blender = engine_override == "blender"
+    requested_generator_mode = engine_override if is_openscad_mode(engine_override) else None
+    generator_mode: str | None = None
     if engine_override:
         # Blender is a post-processor, not a source geometry generator. Build a
         # deterministic source mesh first so the UI's direct Blender option is runnable.
-        route = ("openscad" if structural else "hunyuan3d") if force_blender else engine_override
+        if requested_generator_mode:
+            route = "openscad"
+            generator_mode = resolve_generator_mode(requested_generator_mode, str(design_state.get("category") or "equipment"))
+        else:
+            route = ("openscad" if structural else "hunyuan3d") if force_blender else engine_override
         confidence = 1.0
-        reasons.insert(0, "Blender용 기초 형상을 먼저 생성한 뒤 후처리함" if force_blender else "고급 설정에서 생성 엔진을 직접 지정함")
+        if requested_generator_mode:
+            reasons.insert(0, f"고급 설정에서 {generator_mode} 파라메트릭 생성기를 직접 지정함")
+        else:
+            reasons.insert(0, "Blender용 기초 형상을 먼저 생성한 뒤 후처리함" if force_blender else "고급 설정에서 생성 엔진을 직접 지정함")
     elif output_goal == "fast":
         route = "hunyuan3d"
         confidence = 0.95
@@ -100,6 +111,9 @@ def plan_generation(
             confidence = 0.62
             reasons.append("명확한 구조 단서가 적어 빠른 Mesh Preview를 우선함")
 
+    if route in {"openscad", "hybrid"} and generator_mode is None:
+        generator_mode = GENERIC_MODE
+
     postprocess: list[str] = []
     if force_blender or output_goal in {"high_quality", "motion_openusd"} or quality_profile == "final" or route == "hybrid":
         postprocess.append("blender")
@@ -130,6 +144,7 @@ def plan_generation(
             "component_id": component.get("id"),
             "representation_policy": policy,
             "engine": engine,
+            "generator_mode": generator_mode if engine == "openscad" else None,
         })
 
     fallback_chain = {
@@ -144,6 +159,8 @@ def plan_generation(
         "output_goal": output_goal,
         "quality_profile": quality_profile,
         "primary_route": primary_route,
+        "generator_mode": generator_mode,
+        "requested_generator_mode": requested_generator_mode,
         "secondary_routes": secondary_routes,
         "postprocess": postprocess,
         "confidence": round(confidence, 3),

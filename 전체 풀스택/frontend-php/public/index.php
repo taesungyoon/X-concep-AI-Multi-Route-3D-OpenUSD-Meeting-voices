@@ -6,6 +6,10 @@ require_once dirname(__DIR__) . '/src/ControlPlaneClient.php';
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+$assetVersion = max(
+    (int) @filemtime(__DIR__ . '/assets/css/app.css'),
+    (int) @filemtime(__DIR__ . '/assets/js/app.js')
+);
 
 try {
     if ($path === '/health') {
@@ -31,7 +35,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#07111f">
     <title>X concep AI · Multi-Route 3D Studio</title>
-    <link rel="stylesheet" href="/assets/css/app.css">
+    <link rel="stylesheet" href="/assets/css/app.css?v=<?= rawurlencode((string) $assetVersion) ?>">
     <script type="importmap">
     {
       "imports": {
@@ -140,7 +144,7 @@ try {
                         <summary>고급 설정</summary>
                         <div class="advanced-grid">
                             <label>품질 프로필<select name="quality_profile" id="qualityProfile"><option value="preview">Preview</option><option value="standard" selected>Standard</option><option value="final">Final</option></select></label>
-                            <label>엔진 직접 선택<select name="engine_override" id="engineOverride"><option value="">자동 라우팅</option><option value="hunyuan3d">TripoSR 이미지 3D</option><option value="openscad">OpenSCAD</option><option value="blender">Blender</option><option value="hybrid">Hybrid</option></select></label>
+                            <label>엔진 직접 선택<select name="engine_override" id="engineOverride"><option value="">자동 라우팅</option><option value="hunyuan3d">TripoSR 이미지 3D</option><option value="openscad">OpenSCAD 범용 (기존)</option><option value="openscad_auto">OpenSCAD 자동 추천</option><option value="openscad_part">OpenSCAD 부품 파라메트릭</option><option value="openscad_module">OpenSCAD 모듈 파라메트릭</option><option value="openscad_equipment">OpenSCAD 설비 파라메트릭</option><option value="blender">Blender</option><option value="hybrid">Hybrid</option></select></label>
                         </div>
                     </details>
                 </div>
@@ -227,7 +231,7 @@ try {
                             <button type="button" data-regenerate-goal="fast">더 빠르게 생성</button>
                             <button type="button" data-regenerate-goal="structural">구조를 정확하게 재생성</button>
                             <button type="button" data-regenerate-goal="high_quality">더 사실적으로 재생성</button>
-                            <button type="button" data-regenerate-goal="motion_openusd">동작·OpenUSD로 확장</button>
+                            <button type="button" data-regenerate-goal="motion_openusd">동작·OpenUSD로 확장</button><button type="button" id="partialRegenerateButton" hidden>실패 항목만 재생성</button>
                         </div>
                     </div>
                     <div class="download-panel"><span class="section-label">파일 다운로드</span><a class="download-btn primary" id="downloadGlb" download>GLB <small>웹 3D 뷰어</small></a><a class="download-btn" id="downloadStl" download>STL <small>메시 출력</small></a><a class="download-btn" id="downloadScad" download hidden>SCAD <small>파라메트릭 구조 코드</small></a><a class="download-btn" id="downloadGeometryJson" download hidden>Geometry JSON <small>공통 구조 데이터</small></a><a class="download-btn" id="downloadBlenderScript" download hidden>Blender Script <small>후처리·재현 코드</small></a><a class="download-btn" id="downloadUsda" download>OpenUSD · USDA <small>Omniverse 연계</small></a><a class="download-btn" id="downloadUsdc" download hidden>OpenUSD · USDC <small>Binary Stage</small></a><a class="download-btn" id="downloadUsdRoot" download hidden>OpenUSD Package <small>Layered root.usda</small></a><a class="download-btn" id="downloadUsdManifest" download hidden>USD Manifest <small>Kit·Nucleus 연동 정보</small></a><a class="download-btn" id="downloadRender" download>PNG <small>렌더링 이미지</small></a><button class="download-btn omniverse-launch" id="openOmniverseButton" type="button">Omniverse RTX <small>Kit WebRTC Viewer</small></button></div>
@@ -244,6 +248,6 @@ try {
 
 <div class="loading-overlay" id="loadingOverlay" aria-hidden="true"><div class="loading-card"><div class="progress-ring"><span id="loadingPercent">0%</span></div><h2 id="loadingTitle">생성 준비 중</h2><p id="loadingMessage">입력 내용을 분석하고 있음</p><div class="loading-steps"><span class="active">요구사항 분석</span><span>2D 생성</span><span>결과 정리</span></div></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="/assets/js/app.js"></script>
+<script type="module" src="/assets/js/app.js?v=<?= rawurlencode((string) $assetVersion) ?>"></script>
 </body>
 </html>

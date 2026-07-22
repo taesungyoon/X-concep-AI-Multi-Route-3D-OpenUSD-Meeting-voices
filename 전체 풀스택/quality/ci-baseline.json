@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "xconcep-ci-smoke-v1",
+  "reports": [
+    {
+      "id": "quality-program-smoke",
+      "path": "storage/quality-program/latest.json",
+      "checks": [
+        {"path": "passed", "operator": "eq", "value": true},
+        {"path": "phases.0.score_pct", "operator": "min", "value": 90.0},
+        {"path": "phases.1.score_pct", "operator": "min", "value": 100.0},
+        {"path": "phases.2.score_pct", "operator": "min", "value": 100.0},
+        {"path": "phases.3.score_pct", "operator": "min", "value": 100.0},
+        {"path": "phases.4.score_pct", "operator": "min", "value": 100.0}
+      ]
+    }
+  ]
+}
