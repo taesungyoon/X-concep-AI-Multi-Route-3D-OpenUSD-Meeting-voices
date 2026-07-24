@@ -1,0 +1,13 @@
+{
+    "schema_version": "1.0",
+    "sample_id": "CAD-32734467F3F6",
+    "score": 1,
+    "warnings": [],
+    "checks": {
+        "signature_valid": true,
+        "parser_completed": true,
+        "geometry_non_empty": true,
+        "bbox_available": true,
+        "label_available": true
+    }
+}

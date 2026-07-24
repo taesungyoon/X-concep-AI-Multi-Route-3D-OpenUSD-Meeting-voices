@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-EQUIPMENT_CONVEYOR_INSPECTION_001", "source": {"format": "xconcep_parametric", "sha256": "989ea8f608edff92c3b2b5933e184357d24f3b8bdb1fb3b91a5664880c692587"}, "label": {"category": "equipment"}, "split": "train", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

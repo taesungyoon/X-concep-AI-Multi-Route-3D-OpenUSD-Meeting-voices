@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-PART_MOTOR_MOUNT_003", "source": {"format": "xconcep_parametric", "sha256": "a1a5e327252f07094b3f915f02e33c5bce36cec3cb024be952b3261ed91353b5"}, "label": {"category": "part"}, "split": "eval", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

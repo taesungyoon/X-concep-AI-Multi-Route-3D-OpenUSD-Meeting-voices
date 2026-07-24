@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-PART_L_BRACKET_001", "source": {"format": "xconcep_parametric", "sha256": "61c33290f45aa10353e64f83eeed6972e120053262951dd179296b0b7ea4c514"}, "label": {"category": "part"}, "split": "train", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

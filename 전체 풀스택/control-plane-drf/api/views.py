@@ -1,3 +1,11 @@
+"""HTTP control plane for authenticated, queued generation workflows.
+
+The frontend talks only to these endpoints. This layer owns MySQL project/job
+state and uploads, then delegates heavy work through Celery -> agent gateway ->
+Python worker. Meeting audio follows create -> chunk/transcribe -> analyze ->
+generate-2D, after which it rejoins the normal select-2D -> generate-3D flow.
+"""
+
 import re
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -21,9 +29,11 @@ from .corporate_auth import (
 def project_data(p): return ProjectSerializer(p).data
 
 def queued_response(project, job):
+    """Return the stable HTTP 202 contract consumed by UI/smoke-test polling."""
     return Response({'project':project_data(project),'job':JobSerializer(job).data},status=202)
 
 def queue_2d(project, assets, meeting_analysis=None):
+    """Persist the job before dispatch so queue failures remain observable."""
     payload={'asset_ids':[a.pk for a in assets],'meeting_analysis':meeting_analysis}
     job=services.create_queued_job(project,'generate_2d',payload)
     project.status='queued_2d'; project.progress=0; project.step='compare'; project.save()
@@ -96,6 +106,7 @@ def system_status(request):
 @api_view(['GET','POST'])
 @parser_classes([MultiPartParser,FormParser,JSONParser])
 def projects(request):
+    """List recent work or create a prompt/image project and start 2D generation."""
     if request.method=='GET':
         qs=Project.objects.order_by('-updated_at')[:20]
         items=[]
@@ -125,6 +136,7 @@ def projects(request):
 
 @api_view(['POST'])
 def meetings(request):
+    """Create the project shell used by streamed meeting-audio workflows."""
     category=(request.data.get('category') or 'equipment').strip()
     if category not in {'equipment','module','part'}: return Response({'error':'지원하지 않는 생성 유형임'},status=422)
     output_goal=(request.data.get('output_goal') or 'auto').strip(); quality_profile=(request.data.get('quality_profile') or 'standard').strip()
@@ -136,6 +148,7 @@ def project_detail(request,project_id): return Response({'project':project_data(
 
 @api_view(['POST'])
 def project_generate_3d(request,project_id):
+    """Validate a selected concept and enqueue the planned multi-route 3D job."""
     p=get_object_or_404(Project,pk=project_id); cid=(request.data.get('selected_2d_id') or '').strip(); selected=p.concepts.filter(concept_id=cid).first()
     if not selected: return Response({'error':'선택한 2D 결과가 올바르지 않음'},status=422)
     output_goal=(request.data.get('output_goal') or p.output_goal or 'auto').strip()

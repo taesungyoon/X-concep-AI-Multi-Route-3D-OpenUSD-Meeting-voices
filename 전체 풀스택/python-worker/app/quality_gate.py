@@ -70,6 +70,7 @@ def validate_asset(
     manifest_path: Path | None = None,
     dimension_tolerance_pct: float = 5.0,
     blender_processed: bool = False,
+    independent_validation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     metrics = _scene_metrics(glb_path)
     checks: list[dict[str, Any]] = []
@@ -157,7 +158,7 @@ def validate_asset(
             "value": multiview_validation.get("checks") or [],
         })
 
-    semantic_validation = manifest.get("semantic_validation") or {}
+    semantic_validation = independent_validation or manifest.get("semantic_validation") or {}
     semantic_passed = semantic_validation.get("passed") is True
     if semantic_validation:
         checks.append({
@@ -224,11 +225,15 @@ def validate_asset(
         "checks": checks,
         "metrics": metrics,
         "multiview": multiview_validation,
-        "regeneration_plan": multiview_validation.get("regeneration_plan") or {
-            "recommended": False,
-            "scopes": [],
-            "strategy": "none",
-        },
+        "regeneration_plan": (
+            semantic_validation.get("regeneration_plan")
+            if (semantic_validation.get("regeneration_plan") or {}).get("recommended")
+            else multiview_validation.get("regeneration_plan") or {
+                "recommended": False,
+                "scopes": [],
+                "strategy": "none",
+            }
+        ),
         "usage_scope": usage,
         "next_required_review": "엔지니어 검토" if grade in {"concept", "structured", "validated"} else "제조 승인",
         "manufacturing_note": (

@@ -15,6 +15,63 @@ _COUNT_PATTERN = re.compile(
 )
 
 
+def requirements_from_design_spec(design_spec: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    """Convert the deterministic DesignSpec into the image verifier contract.
+
+    This keeps the 2D generator, semantic verifier and parametric 3D generator
+    on the same component quantities and spatial relations.
+    """
+    requirements: list[dict[str, Any]] = []
+    index_by_kind: dict[str, int] = {}
+    for component in design_spec.get("components") or []:
+        if not isinstance(component, dict) or component.get("required") is False:
+            continue
+        kind = str(component.get("kind") or component.get("id") or component.get("name") or "").strip()
+        if not kind:
+            continue
+        try:
+            count = max(1, int(component.get("quantity") or component.get("count") or 1))
+        except (TypeError, ValueError):
+            count = 1
+        index_by_kind.setdefault(kind, len(requirements))
+        requirements.append({"class": kind, "count": count})
+
+    has_position = False
+    relation_aliases = {
+        "left_of": "left of",
+        "right_of": "right of",
+        "front_of": "in front of",
+        "behind": "behind",
+        "above": "above",
+        "below": "below",
+    }
+    for relation in design_spec.get("relationships") or []:
+        if not isinstance(relation, dict) or relation.get("required") is False:
+            continue
+        subject = str(relation.get("subject") or "").strip()
+        target = str(relation.get("object") or "").strip()
+        subject_index = index_by_kind.get(subject)
+        target_index = index_by_kind.get(target)
+        if subject_index is None or target_index is None or "position" in requirements[subject_index]:
+            continue
+        normalized_relation = relation_aliases.get(
+            str(relation.get("relation") or "").strip().lower(),
+            str(relation.get("relation") or "").strip().replace("_", " "),
+        )
+        if not normalized_relation:
+            continue
+        requirements[subject_index]["position"] = [normalized_relation, target_index]
+        has_position = True
+
+    if has_position:
+        stratum = "position"
+    elif len(requirements) > 1 or any(int(item["count"]) > 1 for item in requirements):
+        stratum = "counting"
+    else:
+        stratum = "single_object"
+    return stratum, requirements
+
+
 def requires_precision_route(
     prompt: str,
     *,

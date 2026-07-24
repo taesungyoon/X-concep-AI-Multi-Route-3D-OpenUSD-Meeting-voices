@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import trimesh
 from pxr import Usd, UsdGeom
 
-from app.openusd_exporter import OpenUSDExportError, export_openusd
+from app.openusd_exporter import OpenUSDExportError, export_openusd, validate_usda
 
 
 def _source_glb(path):
@@ -48,7 +50,14 @@ def test_layered_export_rejects_unknown_composition_arc(tmp_path):
 
 def test_layered_export_preserves_parametric_assembly_hierarchy(tmp_path):
     glb = tmp_path / "source.glb"
-    _source_glb(glb)
+    scene = trimesh.Scene()
+    for component_id in ("conveyor_1", "camera_1", "camera_lens"):
+        scene.add_geometry(
+            trimesh.creation.box(extents=(0.1, 0.1, 0.1)),
+            node_name=component_id,
+            geom_name=component_id,
+        )
+    glb.write_bytes(scene.export(file_type="glb"))
     contract = {
         "generator_mode": "openscad_equipment",
         "generator_version": "1.0.0",
@@ -69,6 +78,16 @@ def test_layered_export_preserves_parametric_assembly_hierarchy(tmp_path):
                 "center_mm": [0, 0, 1300],
                 "size_mm": [160, 120, 100],
             },
+            {
+                "id": "camera_lens",
+                "kind": "camera_lens",
+                "requirement_id": "vision_camera",
+                "shape": "cylinder",
+                "diameter_mm": 34,
+                "height_mm": 30,
+                "axis": "Y",
+                "center_mm": [0, -60, 1300],
+            },
         ],
     }
     result = export_openusd(
@@ -81,8 +100,16 @@ def test_layered_export_preserves_parametric_assembly_hierarchy(tmp_path):
     assert "assembly" in result["layers"]
     assembly_text = open(result["layers"]["assembly"], encoding="utf-8").read()
     assert 'def Xform "Assembly"' in assembly_text
-    assert assembly_text.count("xconcep:requirementId") == 2
+    assert assembly_text.count("xconcep:requirementId") == 3
     stage = Usd.Stage.Open(result["layers"]["root"])
     assert stage.GetPrimAtPath("/World/Asset/Assembly/conveyor_1").IsValid()
     camera = stage.GetPrimAtPath("/World/Asset/Assembly/camera_1")
     assert camera.GetAttribute("xconcep:bboxCenterM").Get() == pytest.approx((0.0, 0.0, 1.3))
+    lens = stage.GetPrimAtPath("/World/Asset/Assembly/camera_lens")
+    assert lens.GetAttribute("xconcep:bboxSizeM").Get() == pytest.approx((0.034, 0.03, 0.034))
+
+    direct_validation = validate_usda(Path(result["usda"]))
+    package_validation = validate_usda(Path(result["layers"]["root"]))
+    assert direct_validation["assembly_component_count"] == 3
+    assert package_validation["assembly_component_count"] == 3
+    assert package_validation["stage_assembly_component_count"] == 3

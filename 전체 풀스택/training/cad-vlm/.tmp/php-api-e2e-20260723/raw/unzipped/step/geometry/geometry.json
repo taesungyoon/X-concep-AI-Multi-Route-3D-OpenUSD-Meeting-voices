@@ -1,0 +1,106 @@
+{
+    "schema_version": "1.0",
+    "sample_id": "CAD-79560A085C15",
+    "source": {
+        "format": "step",
+        "original_filename": "simple.step",
+        "sha256": "a9a0678b9dd6d4691b28a8e0f6ac5decd2912d6622720183b3aaa62ce706959a",
+        "size_bytes": 840
+    },
+    "parser_mode": "php_part21_step_v1",
+    "entity_counts": {
+        "ADVANCED_FACE": 1,
+        "APPLICATION_CONTEXT": 1,
+        "CARTESIAN_POINT": 6,
+        "CLOSED_SHELL": 1,
+        "EDGE_CURVE": 1,
+        "MANIFOLD_SOLID_BREP": 1,
+        "PLANE": 1,
+        "PRODUCT": 1,
+        "PRODUCT_CONTEXT": 1,
+        "VERTEX_POINT": 2
+    },
+    "layers": [],
+    "texts": [],
+    "products": [
+        "simple_bracket"
+    ],
+    "points": [
+        [
+            0,
+            0,
+            0
+        ],
+        [
+            100,
+            0,
+            0
+        ],
+        [
+            100,
+            50,
+            0
+        ],
+        [
+            0,
+            50,
+            0
+        ],
+        [
+            0,
+            0,
+            10
+        ],
+        [
+            100,
+            50,
+            10
+        ]
+    ],
+    "primitives": [],
+    "bbox": {
+        "min": [
+            0,
+            0,
+            0
+        ],
+        "max": [
+            100,
+            50,
+            10
+        ],
+        "extent": [
+            100,
+            50,
+            10
+        ]
+    },
+    "topology": {
+        "edge_count": 1,
+        "face_count": 1,
+        "shell_count": 1,
+        "solid_count": 1
+    },
+    "surfaces": {
+        "plane": 1,
+        "cylinder": 0,
+        "cone": 0,
+        "sphere": 0,
+        "torus": 0,
+        "bspline": 0
+    },
+    "normalization": {
+        "center": [
+            50,
+            25,
+            5
+        ],
+        "scale": 100,
+        "units": "unknown"
+    },
+    "provenance": {
+        "implementation": "php",
+        "version": "1.0.0",
+        "created_at": "2026-07-23T10:25:00+00:00"
+    }
+}

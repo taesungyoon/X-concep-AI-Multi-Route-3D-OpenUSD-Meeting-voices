@@ -1,8 +1,17 @@
+"""Stable workflow gateway between the control plane and generation services.
+
+``fallback`` forwards directly to the Python worker and is the local default.
+``nat`` additionally exposes the installed NeMo Agent Toolkit workflow without
+changing the frontend/control-plane API contract.
+"""
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import os, httpx
 
 app=FastAPI(title='X concep NeMo Agent Gateway',version='1.0.0')
+# Internal service URLs are Docker DNS names by default; override only when a
+# service is intentionally moved to another host.
 WORKER=os.getenv('PYTHON_WORKER_URL','http://python-worker:8001').rstrip('/')
 KNOWLEDGE=os.getenv('KNOWLEDGE_SERVICE_URL','http://knowledge-service:8020').rstrip('/')
 RUNTIME=os.getenv('AGENT_RUNTIME','fallback')
@@ -12,6 +21,7 @@ class Payload(BaseModel):
     model_config={'extra':'allow'}
 
 async def post(path,payload,timeout=3600):
+    """Forward long-running workflow calls while preserving upstream errors."""
     async with httpx.AsyncClient(timeout=timeout) as c:
         r=await c.post(WORKER+path,json=payload); r.raise_for_status(); return r.json()
 

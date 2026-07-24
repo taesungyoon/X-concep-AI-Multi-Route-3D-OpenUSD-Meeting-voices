@@ -1,5 +1,14 @@
+/*
+ * Browser workflow controller:
+ * internal-DB auth -> prompt/meeting input -> queued 2D comparison
+ * -> selected concept -> routed 3D -> validation/OpenUSD downloads.
+ *
+ * The backend owns generation state. This file only holds transient UI state,
+ * attaches the bearer token, polls jobs, and renders persisted project data.
+ */
 let viewerModulePromise;
 const nativeFetch = window.fetch.bind(window);
+// Tokens live only for this browser tab and are never written to project files.
 const authSession = {
   token: sessionStorage.getItem('xconcep.auth.token') || '',
   required: false,
@@ -13,6 +22,7 @@ window.fetch = (input, init = {}) => {
   return nativeFetch(input, { ...init, headers });
 };
 function viewerModule() {
+  // Three.js is lazy-loaded only when a 3D result reaches the viewer stage.
   viewerModulePromise ||= import('./viewer.js');
   return viewerModulePromise;
 }
@@ -21,6 +31,7 @@ async function loadModel(...args) { return (await viewerModule()).loadModel(...a
 async function setView(...args) { return (await viewerModule()).setView(...args); }
 async function toggleFullscreen(...args) { return (await viewerModule()).toggleFullscreen(...args); }
 
+// One state object keeps prompt and meeting flows aligned after they join at 2D.
 const state = { project: null, selected2d: null, files: [], inputMode: 'prompt', meeting: { recorder: null, stream: null, chunks: 0, timer: null, seconds: 0, analyserFrame: null } };
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => [...document.querySelectorAll(selector)];
@@ -47,6 +58,7 @@ function showAuthenticatedUser(user) {
 }
 
 async function initializeAuthentication() {
+  // AUTH_MODE may be disabled in isolated development or required for DB modes.
   try {
     const configResponse = await nativeFetch('/api/auth/config');
     const config = await configResponse.json();
@@ -141,7 +153,7 @@ function showToast(message) {
 
 function startLoading(type) {
   const configs = type === 'meeting'
-    ? { title: '회의 요구사항을 분석하고 있음', messages: ['음성 전사 내용을 정리하고 있음', 'Gemma가 결정사항과 변경사항을 분리하고 있음', 'OpenUSD 메타데이터를 준비하고 있음'], labels: ['전사 정리', '요구사항 분석', 'USD 준비'] }
+    ? { title: '회의 요구사항을 분석하고 있음', messages: ['음성 전사 내용을 정리하고 있음', '요구사항 분석기가 결정사항과 변경사항을 분리하고 있음', 'OpenUSD 메타데이터를 준비하고 있음'], labels: ['전사 정리', '요구사항 분석', 'USD 준비'] }
     : type === '3d'
     ? { title: '3D 설계를 생성하고 있음', messages: ['선택한 2D 형상을 분석하고 있음', '3D 구조와 메시를 생성하고 있음', 'GLB·STL 파일을 내보내고 있음'], labels: ['2D 분석', '3D 생성', '파일 출력'] }
     : { title: '2D 컨셉을 생성하고 있음', messages: ['프롬프트와 이미지를 분석하고 있음', '서로 다른 설계 방향을 생성하고 있음', '비교할 결과를 정리하고 있음'], labels: ['요구사항 분석', '2D 생성', '결과 정리'] };
@@ -179,6 +191,8 @@ function stopLoading() {
 const wait = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 async function waitForJob(jobId, projectId, timeoutMs = 2 * 60 * 60 * 1000) {
+  // Celery operations return 202; the UI resumes from the persisted project
+  // after completion so a refresh never depends on an in-memory response.
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const response = await fetch(`/api/jobs/${jobId}`);
@@ -285,6 +299,8 @@ function updateMeetingBadge(text, live = false) {
 }
 
 async function startMeeting() {
+  // MediaRecorder emits bounded chunks; each chunk is stored and transcribed
+  // independently before the transcript is analyzed into design requirements.
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
     showToast('이 브라우저는 회의 녹음을 지원하지 않음. 직접 입력을 사용해야 함');
     return;
@@ -377,6 +393,7 @@ function renderTranscript() {
 }
 
 async function analyzeMeeting() {
+  // Analysis turns raw transcript text into the same prompt contract as manual input.
   try {
     await ensureMeetingProject();
     const transcript = manualTranscript.value.trim() || state.project.meeting?.transcript || '';
@@ -428,6 +445,7 @@ analyzeMeetingButton.addEventListener('click', analyzeMeeting);
 generateMeeting2dButton.addEventListener('click', generateMeeting2d);
 
 form.addEventListener('submit', async (event) => {
+  // Direct prompt/image entry joins the shared pipeline at the 2D comparison stage.
   event.preventDefault();
   const prompt = promptInput.value.trim();
   if (prompt.length < 8) return showToast('프롬프트를 8자 이상 입력해야 함');
@@ -473,6 +491,8 @@ function selectConcept(item, card) {
 }
 
 generate3dButton.addEventListener('click', async () => {
+  // The selected output goal/engine are hints; the backend router persists the
+  // authoritative plan and may add structural, Blender, or OpenUSD postprocess.
   if (!state.project || !state.selected2d) return;
   startLoading('3d');
   try {
@@ -496,6 +516,7 @@ generate3dButton.addEventListener('click', async () => {
 });
 
 async function renderResult() {
+  // Render only server-persisted artifacts so history reload matches live output.
   const result = state.project.result_3d || {};
   const selected = (state.project.results_2d || []).find(item => item.id === state.project.selected_2d_id) || state.selected2d;
   qs('#selectedReference').src = safeAssetUrl(selected?.url || result.preview_url);
@@ -603,6 +624,7 @@ async function regenerateWithGoal(goal) {
 }
 
 async function regenerateFailedScopes() {
+  // Partial regeneration sends only failed contract scopes and keeps passed parts.
   const button = qs('#partialRegenerateButton');
   const scopes = JSON.parse(button.dataset.scopes || '[]');
   if (!state.project || !state.project.selected_2d_id || !scopes.length) return;
@@ -640,7 +662,14 @@ qs('#newProjectButton').addEventListener('click', () => {
   qsa('.type-card').forEach((c, i) => c.classList.toggle('selected', i === 0)); qsa('.goal-card').forEach((c, i) => c.classList.toggle('selected', i === 0));
   setStage(1);
 });
-qsa('[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
+qsa('[data-view]').forEach(button => button.addEventListener('click', async () => {
+  await setView(button.dataset.view);
+  qsa('[data-view]').forEach(item => {
+    const active = item.dataset.view === button.dataset.view;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-pressed', String(active));
+  });
+}));
 qs('#fullscreenButton').addEventListener('click', toggleFullscreen);
 qs('#openOmniverseButton').addEventListener('click', event => {
   const url = event.currentTarget.dataset.streamUrl;
@@ -649,6 +678,7 @@ qs('#openOmniverseButton').addEventListener('click', event => {
 });
 
 async function openHistory() {
+  // History is read from MySQL, not from browser state.
   historyDrawer.classList.add('open');
   historyDrawer.setAttribute('aria-hidden', 'false');
   const list = qs('#historyList');
@@ -681,6 +711,31 @@ async function loadProject(id) {
   } catch (error) { showToast(error.message || '프로젝트를 열 수 없음'); }
 }
 
+qsa('[data-step]').forEach(button => button.addEventListener('click', async () => {
+  const target = Number(button.dataset.step);
+  if (target === 1) {
+    setStage(1);
+    return;
+  }
+  if (target === 2) {
+    if (!state.project?.results_2d?.length) {
+      showToast('먼저 2D 컨셉을 생성해야 함');
+      return;
+    }
+    renderCompare();
+    setStage(2);
+    return;
+  }
+  if (target === 3) {
+    if (!state.project?.result_3d) {
+      showToast('먼저 3D 결과를 생성해야 함');
+      return;
+    }
+    await renderResult();
+    setStage(3);
+  }
+}));
+
 function closeHistory() { historyDrawer.classList.remove('open'); historyDrawer.setAttribute('aria-hidden', 'true'); }
 qs('#historyButton').addEventListener('click', openHistory);
 qsa('[data-close-history]').forEach(el => el.addEventListener('click', closeHistory));
@@ -699,6 +754,7 @@ setInputMode('prompt');
 
 
 async function loadSystemStatus() {
+  // Provider badges expose effective runtime modes without leaking credentials.
   const strip = qs('#systemStrip');
   if (!strip) return;
   try {

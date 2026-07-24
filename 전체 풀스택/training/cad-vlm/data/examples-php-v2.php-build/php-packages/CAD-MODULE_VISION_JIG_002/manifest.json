@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-MODULE_VISION_JIG_002", "source": {"format": "xconcep_parametric", "sha256": "10ea017cfe0438fc11f8e92410590d0afec3663c23f3610f1d55feb2a11842ec"}, "label": {"category": "module"}, "split": "train", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

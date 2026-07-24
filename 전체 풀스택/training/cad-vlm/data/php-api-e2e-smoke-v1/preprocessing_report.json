@@ -1,0 +1,34 @@
+{
+  "schema": "xconcep.cad-vlm-preprocess-report/1.0",
+  "raw_manifest": "records.jsonl",
+  "raw_manifest_sha256": "2af92830d4533ef519752abef6c71a731be43181d08cc35b0b1790215e8311ab",
+  "max_image_side": 512,
+  "min_images": 1,
+  "split_ratios": {
+    "train": 0.8,
+    "eval": 0.1,
+    "test": 0.1
+  },
+  "validation": {
+    "schema": "xconcep.cad-vlm-validation/1.0",
+    "valid": true,
+    "record_count": 2,
+    "image_count": 2,
+    "split_counts": {
+      "eval": 1,
+      "train": 1
+    },
+    "category_counts": {
+      "equipment": 1,
+      "part": 1
+    },
+    "allowed_training_licenses": [
+      "Apache-2.0",
+      "BSD-2-Clause",
+      "BSD-3-Clause",
+      "CC0-1.0",
+      "LicenseRef-Xconcep-Internal-Generated",
+      "MIT"
+    ]
+  }
+}

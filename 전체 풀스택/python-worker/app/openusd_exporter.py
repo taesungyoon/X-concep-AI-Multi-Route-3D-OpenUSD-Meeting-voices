@@ -95,6 +95,15 @@ def validate_usda(path: Path) -> dict[str, Any]:
             prims = list(stage.Traverse())
             result["traversed_prim_count"] = len(prims)
             result["stage_mesh_count"] = sum(1 for prim in prims if prim.GetTypeName() == "Mesh")
+            stage_component_count = sum(
+                1 for prim in prims
+                if prim.HasAttribute("xconcep:requirementId")
+            )
+            result["stage_assembly_component_count"] = stage_component_count
+            result["assembly_component_count"] = max(
+                int(result["assembly_component_count"]),
+                stage_component_count,
+            )
     except ImportError:
         pass
     except Exception as exc:
@@ -262,7 +271,7 @@ def _write_assembly_layer(path: Path, contract: dict[str, Any]) -> None:
     for index, component in enumerate(contract.get("components") or [], start=1):
         name = _identifier(str(component.get("id") or f"Component_{index}"), used)
         center = _mm_vec_to_m(component.get("center_mm"), (0.0, 0.0, 0.0))
-        size = _mm_vec_to_m(component.get("size_mm"), (0.0, 0.0, 0.0))
+        size = _component_size_m(component)
         lines.extend([
             f'            def Xform "{name}"',
             "            {",
@@ -431,13 +440,14 @@ def _write_usda(
     used: set[str] = set()
     for mesh_index, (node_name, mesh) in enumerate(_flatten_scene(scene), start=1):
         name = _identifier(str(node_name or f"Mesh_{mesh_index}"), used)
+        component = _component_for_node(metadata, str(node_name or ""))
         points = ",\n                    ".join(_vec3(v) for v in np.asarray(mesh.vertices, dtype=float))
         counts = ", ".join("3" for _ in mesh.faces)
         indices = ", ".join(str(int(index)) for index in np.asarray(mesh.faces).reshape(-1))
         extent = np.asarray(mesh.bounds, dtype=float)
         display = _display_color(mesh)
         api = ' (\n            prepend apiSchemas = ["PhysicsCollisionAPI"]\n        )' if enable_physics else ""
-        lines.extend([
+        mesh_lines = [
             f'        def Mesh "{name}"{api}',
             "        {",
             f"            point3f[] points = [{points}]",
@@ -449,8 +459,15 @@ def _write_usda(
             "            )",
             '            uniform token subdivisionScheme = "none"',
             f'            custom string xconcep:semanticLabel = "{_escape(name)}"',
-            "        }",
-        ])
+        ]
+        if component:
+            mesh_lines.extend([
+                f'            custom string xconcep:componentId = "{_escape(str(component.get("id") or name))}"',
+                f'            custom string xconcep:kind = "{_escape(str(component.get("kind") or "component"))}"',
+                f'            custom string xconcep:requirementId = "{_escape(str(component.get("requirement_id") or component.get("kind") or "component"))}"',
+            ])
+        mesh_lines.append("        }")
+        lines.extend(mesh_lines)
     lines.extend(["    }", "}", ""])
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -497,6 +514,7 @@ def _write_usdc(
     used: set[str] = set()
     for mesh_index, (node_name, mesh) in enumerate(_flatten_scene(scene), start=1):
         name = _identifier(str(node_name or f"Mesh_{mesh_index}"), used)
+        component = _component_for_node(metadata, str(node_name or ""))
         usd_mesh = UsdGeom.Mesh.Define(stage, f"/World/Asset/{name}")
         usd_mesh.CreatePointsAttr([Gf.Vec3f(*map(float, v)) for v in mesh.vertices])
         usd_mesh.CreateFaceVertexCountsAttr([3] * len(mesh.faces))
@@ -505,6 +523,14 @@ def _write_usdc(
         color = _display_color(mesh)
         usd_mesh.CreateDisplayColorAttr([Gf.Vec3f(*map(float, color))])
         usd_mesh.GetPrim().CreateAttribute("xconcep:semanticLabel", Sdf.ValueTypeNames.String, custom=True).Set(name)
+        if component:
+            component_attrs = {
+                "xconcep:componentId": component.get("id") or name,
+                "xconcep:kind": component.get("kind") or "component",
+                "xconcep:requirementId": component.get("requirement_id") or component.get("kind") or "component",
+            }
+            for key, value in component_attrs.items():
+                usd_mesh.GetPrim().CreateAttribute(key, Sdf.ValueTypeNames.String, custom=True).Set(str(value))
         if enable_physics:
             UsdPhysics.CollisionAPI.Apply(usd_mesh.GetPrim())
     stage.GetRootLayer().Save()
@@ -532,6 +558,29 @@ def _display_color(mesh: trimesh.Trimesh) -> tuple[float, float, float]:
     except Exception:
         pass
     return 0.55, 0.65, 0.72
+
+
+def _component_for_node(metadata: dict[str, Any], node_name: str) -> dict[str, Any] | None:
+    components = ((metadata.get("geometry_contract") or {}).get("components") or [])
+    for component in components:
+        component_id = str(component.get("id") or "")
+        if component_id and (node_name == component_id or node_name.startswith(f"{component_id}.")):
+            return component
+    return None
+
+
+def _component_size_m(component: dict[str, Any]) -> tuple[float, float, float]:
+    if component.get("shape") != "cylinder":
+        return _mm_vec_to_m(component.get("size_mm"), (0.0, 0.0, 0.0))
+    try:
+        diameter = float(component.get("diameter_mm") or 0.0)
+        height = float(component.get("height_mm") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0, 0.0, 0.0
+    extents = [diameter, diameter, diameter]
+    axis = str(component.get("axis") or "Z").upper()
+    extents[{"X": 0, "Y": 1, "Z": 2}.get(axis, 2)] = height
+    return tuple(value / 1000.0 for value in extents)  # type: ignore[return-value]
 
 
 def _identifier(value: str, used: set[str]) -> str:

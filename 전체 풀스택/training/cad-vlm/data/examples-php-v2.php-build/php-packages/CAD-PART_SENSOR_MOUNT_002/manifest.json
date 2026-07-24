@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-PART_SENSOR_MOUNT_002", "source": {"format": "xconcep_parametric", "sha256": "3140053333d3526953407d5bfae065f364e3422b290aa8dbcd9094d5297ecfeb"}, "label": {"category": "part"}, "split": "train", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

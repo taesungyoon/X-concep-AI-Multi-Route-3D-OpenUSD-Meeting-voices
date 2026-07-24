@@ -128,6 +128,14 @@ python scripts/compare-image-ab.py `
 
 대표 STEP은 CAD skill의 `refs --facts --planes --positioning`과 snapshot으로 별도 시각 검토한다. CAD Viewer 설치본에는 문서가 요구하는 `agent:start` npm script가 없으므로 live viewer 링크 생성은 현재 불가하며 CLI와 snapshot을 증빙으로 사용한다.
 
+### 3.1 도메인 파라메트릭 생성기
+
+기존 범용 `openscad` 모드는 fallback으로 유지하고 `openscad_auto`, `openscad_part`, `openscad_module`, `openscad_equipment`를 추가했다. 전문 모드는 DesignSpec·GeometryContract를 만들고 정면·상면·우측면 계약 투영, 좌표 관계, 요구 그룹 부분 재생성, OpenUSD assembly hierarchy를 검증한다.
+
+현재 네이티브 대표 검증은 부품·모듈·설비 3/3이며 계약 수용률 100%다. 이 값은 동일 계약에서 파생된 구조·실행 acceptance이고 `independent_evaluation=false`다. 실제 도메인 95% 선언은 별도의 고정 홀드아웃과 사람 검토가 필요하다.
+
+전체 계획과 판정 기준은 [범용 OpenSCAD 유지 + 도메인 파라메트릭 생성기 전체 계획](PARAMETRIC_GENERATOR_ROADMAP_KO.md)을 따른다.
+
 ## 4. OpenUSD
 
 `benchmark-openusd-advanced.py`는 다음 6개 계약을 실제 pxr stage 재개방으로 검사한다.

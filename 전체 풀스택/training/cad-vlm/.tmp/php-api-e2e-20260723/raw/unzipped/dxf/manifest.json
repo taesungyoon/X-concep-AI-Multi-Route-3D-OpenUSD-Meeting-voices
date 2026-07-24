@@ -1,0 +1,37 @@
+{
+    "schema_version": "1.0",
+    "sample_id": "CAD-32734467F3F6",
+    "source": {
+        "format": "dxf",
+        "original_filename": "simple.dxf",
+        "sha256": "a32140bcb6a22dfa49b2890d508a56e43a59b8c36bee52bfa2a59c186a564e93",
+        "size_bytes": 443
+    },
+    "label": {
+        "category": "bracket",
+        "project_group": "php-e2e-dxf-v21b",
+        "description": "PHP DXF E2E fixture"
+    },
+    "split": "train",
+    "quality": {
+        "score": 1,
+        "warnings": []
+    },
+    "artifacts": [
+        "source/original.dxf",
+        "geometry/geometry.json",
+        "images/preview.svg",
+        "pointcloud/points_256.ply",
+        "features/baseline_vector.json",
+        "metadata/metadata.json",
+        "metadata/label.json",
+        "quality/report.json",
+        "manifest.json",
+        "manifest.jsonl"
+    ],
+    "provenance": {
+        "pipeline": "cad-ai-php",
+        "version": "1.0.0",
+        "created_at": "2026-07-23T10:25:00+00:00"
+    }
+}

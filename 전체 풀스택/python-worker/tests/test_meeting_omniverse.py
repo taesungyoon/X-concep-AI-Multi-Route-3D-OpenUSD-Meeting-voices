@@ -38,6 +38,24 @@ def test_mock_meeting_transcribe_and_analyze(monkeypatch, tmp_path):
     assert "서보모터" in analyzed["analysis"]["generation_prompt"]
 
 
+def test_meeting_aliases_preserve_equipment_components_for_3d_spec(monkeypatch, tmp_path):
+    pipeline = build_pipeline(monkeypatch, tmp_path)
+    analyzed = pipeline.analyze_meeting(MeetingAnalyzeRequest(
+        project_id="PRJ-MEET-ALIASES",
+        category="equipment",
+        transcript=(
+            "폭 1600밀리미터 깊이 1000밀리미터 높이 1800밀리미터 "
+            "알루미늄 프로파일 검사 설비에 컨베이어 한 대와 비전 카메라 한 개, "
+            "서보 모터 두 개, 전면 안전문과 우측 제어반을 배치합니다."
+        ),
+        segments=[],
+    ))
+
+    components = set(analyzed["analysis"]["components"])
+    assert {"컨베이어", "비전 카메라", "서보모터", "안전도어", "제어반"} <= components
+    assert analyzed["analysis"]["safety_requirements"] == ["안전도어"]
+
+
 def test_openusd_layered_package_contains_omniverse_capabilities(monkeypatch, tmp_path):
     pipeline = build_pipeline(monkeypatch, tmp_path)
     result = pipeline.generate_3d(Generate3DRequest(
@@ -67,3 +85,17 @@ def test_meeting_fallback_marks_unresolved_dimension(monkeypatch, tmp_path):
     assert result['dimensions']['width_mm']==900
     assert any('높이' in item for item in result['unresolved_items'])
     assert any(item['field']=='width_mm' for item in result['requested_changes'])
+
+
+def test_meeting_fallback_parses_spoken_korean_dimensions(monkeypatch, tmp_path):
+    from app.meeting_analyzer import MeetingAnalyzer
+    settings = build_pipeline(monkeypatch, tmp_path).settings
+    result = MeetingAnalyzer(settings).analyze(
+        "설비 폭 천이백 밀리미터, 깊이 팔백 밀리미터, 높이 천육백 밀리미터로 확정합니다.",
+        "equipment",
+    )
+    assert result["dimensions"] == {
+        "width_mm": 1200,
+        "depth_mm": 800,
+        "height_mm": 1600,
+    }

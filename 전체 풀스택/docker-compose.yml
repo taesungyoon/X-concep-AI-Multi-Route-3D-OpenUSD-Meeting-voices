@@ -1,3 +1,8 @@
+# Service flow:
+# browser -> PHP proxy -> Django/MySQL/Celery -> agent gateway -> Python worker.
+# Redis carries jobs, Qdrant stores retrieval memory, and ./storage is the shared
+# artifact boundary. Provider defaults are local; optional external modes come
+# exclusively from the git-ignored .env file.
 services:
   web:
     build: ./frontend-php
@@ -15,6 +20,8 @@ services:
   control-plane:
     build: ./control-plane-drf
     environment: &control_env
+      # API/application database. AUTH_MODE=internal_db reuses this MySQL now;
+      # corporate_db can later point AUTH_DB_* at a separate company database.
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
@@ -56,6 +63,7 @@ services:
       AUTH_DB_ACTIVE_COLUMN: ${AUTH_DB_ACTIVE_COLUMN:-is_active}
       AUTH_DB_PASSWORD_SCHEME: ${AUTH_DB_PASSWORD_SCHEME:-django_hash}
       AUTH_DB_USERNAME_CASE_SENSITIVE: ${AUTH_DB_USERNAME_CASE_SENSITIVE:-false}
+      # The API and generation worker must mount the same storage directory.
       STORAGE_PATH: /app/storage
       AGENT_GATEWAY_URL: http://agent-layer:8010
       KNOWLEDGE_SERVICE_URL: http://knowledge-service:8020
@@ -139,6 +147,8 @@ services:
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-local-not-required}
       GEMMA_MODEL_NAME: ${GEMMA_MODEL_NAME:-gemma-4-64b-local}
+      # Default 2D mode is local ComfyUI/FLUX. Set "openai" explicitly for the
+      # optional paid mode; request/cost limits below remain enforced.
       OPENAI_IMAGE_MODE: ${OPENAI_IMAGE_MODE:-comfyui}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
@@ -172,6 +182,8 @@ services:
       IMAGE_REQUIRE_EXPECTED_ASPECT: ${IMAGE_REQUIRE_EXPECTED_ASPECT:-true}
       IMAGE_SEMANTIC_VERIFIER_URL: ${IMAGE_SEMANTIC_VERIFIER_URL:-}
       IMAGE_SEMANTIC_VERIFIER_TIMEOUT_SECONDS: ${IMAGE_SEMANTIC_VERIFIER_TIMEOUT_SECONDS:-120}
+      # SHAPE_* is the fast/freeform mesh route; OpenSCAD supplies parametric
+      # structure and Blender supplies assembly/render/OpenUSD postprocessing.
       SHAPE_MODE: ${SHAPE_MODE:-triposr}
       SHAPE_PROVIDER: ${SHAPE_PROVIDER:-triposr}
       SHAPE_API_URL: ${SHAPE_API_URL:-http://host.docker.internal:8081}
@@ -186,6 +198,8 @@ services:
       ROUTING_HIGH_CONFIDENCE: ${ROUTING_HIGH_CONFIDENCE:-0.80}
       VALIDATION_DIMENSION_TOLERANCE_PCT: ${VALIDATION_DIMENSION_TOLERANCE_PCT:-5.0}
       ENABLE_PARALLEL_PREVIEW: ${ENABLE_PARALLEL_PREVIEW:-true}
+      # Meeting input uses local ASR by default in .env; NVIDIA/pyannote values
+      # are optional production integrations.
       SPEECH_MODE: ${SPEECH_MODE:-mock}
       NEMO_ASR_MODEL: ${NEMO_ASR_MODEL:-nvidia/parakeet-tdt-0.6b-v3}
       NEMO_DIARIZER_CONFIG: ${NEMO_DIARIZER_CONFIG:-}

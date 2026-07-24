@@ -11,12 +11,13 @@ from api.models import Concept2D, GenerationJob, Project
 def test_health():
     r=APIClient().get('/health'); assert r.status_code==200; assert r.json()['service']=='drf-control-plane'
 @pytest.mark.django_db
+@override_settings(AUTH_MODE='disabled', INTERNAL_API_TOKEN='')
 def test_meeting_project():
     r=APIClient().post('/api/meetings',{'category':'equipment'},format='json'); assert r.status_code==201; assert r.json()['project']['meeting']['status']=='recording_ready'
 
 
 @pytest.mark.django_db
-@override_settings(INTERNAL_API_TOKEN='local-service-token')
+@override_settings(AUTH_MODE='disabled', INTERNAL_API_TOKEN='local-service-token')
 def test_internal_api_token_boundary():
     client=APIClient()
     assert client.get('/health').status_code == 200
@@ -26,6 +27,7 @@ def test_internal_api_token_boundary():
 
 
 @pytest.mark.django_db
+@override_settings(AUTH_MODE='disabled', INTERNAL_API_TOKEN='')
 def test_rejects_fake_image_upload():
     fake=SimpleUploadedFile('fake.png',b'not-an-image',content_type='image/png')
     response=APIClient().post('/api/projects',{
@@ -38,7 +40,7 @@ def test_rejects_fake_image_upload():
 
 
 @pytest.mark.django_db
-@override_settings(SYNC_PIPELINE=False)
+@override_settings(SYNC_PIPELINE=False, AUTH_MODE='disabled', INTERNAL_API_TOKEN='')
 def test_async_generation_is_queued():
     with patch('api.views.generate_2d_task.delay') as delay:
         response=APIClient().post('/api/projects',{
@@ -53,7 +55,7 @@ def test_async_generation_is_queued():
 
 
 @pytest.mark.django_db
-@override_settings(SYNC_PIPELINE=False)
+@override_settings(SYNC_PIPELINE=False, AUTH_MODE='disabled', INTERNAL_API_TOKEN='')
 def test_partial_regeneration_scope_is_queued():
     project=Project.objects.create(
         id='PRJ-PARTIAL-QUEUE',
@@ -98,6 +100,7 @@ def test_partial_regeneration_scope_is_queued():
 
 
 @pytest.mark.django_db
+@override_settings(AUTH_MODE='disabled', INTERNAL_API_TOKEN='')
 def test_partial_regeneration_scope_rejects_unsafe_tokens():
     project=Project.objects.create(
         id='PRJ-PARTIAL-INVALID',

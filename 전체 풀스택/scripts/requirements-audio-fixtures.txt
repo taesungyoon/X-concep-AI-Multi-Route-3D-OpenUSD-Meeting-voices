@@ -1,0 +1,5 @@
+# Offline fixture generation only; not required by the production services.
+piper-onnx==1.0.6
+soundfile==0.14.0
+huggingface_hub==1.24.0
+edge-tts==7.2.8

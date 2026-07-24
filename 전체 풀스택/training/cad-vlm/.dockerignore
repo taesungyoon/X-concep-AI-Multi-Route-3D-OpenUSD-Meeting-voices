@@ -1,0 +1,9 @@
+.venv
+outputs
+dist
+hf-cache
+model-cache
+**/__pycache__
+**/.pytest_cache
+.env
+

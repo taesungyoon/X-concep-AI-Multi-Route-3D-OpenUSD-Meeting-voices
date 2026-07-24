@@ -145,6 +145,30 @@ def test_precision_router_keeps_simple_single_object_on_fast_path():
     assert prompt == "a photo of a red apple"
 
 
+def test_design_spec_is_converted_to_exact_image_contract():
+    worker_root = STACK_ROOT / "python-worker"
+    if str(worker_root) not in sys.path:
+        sys.path.insert(0, str(worker_root))
+    from app.image_precision import requirements_from_design_spec
+
+    stratum, requirements = requirements_from_design_spec({
+        "components": [
+            {"kind": "frame", "quantity": 1, "required": True},
+            {"kind": "conveyor", "quantity": 1, "required": True},
+            {"kind": "servo_motor", "quantity": 3, "required": True},
+            {"kind": "vision_camera", "quantity": 1, "required": True},
+        ],
+        "relationships": [
+            {"subject": "vision_camera", "relation": "above", "object": "conveyor", "required": True},
+        ],
+    })
+
+    assert stratum == "position"
+    assert requirements[1] == {"class": "conveyor", "count": 1}
+    assert requirements[2] == {"class": "servo_motor", "count": 3}
+    assert requirements[3]["position"] == ["above", 1]
+
+
 def test_pmi_parser_accepts_complex_step_entities_and_rejects_dangling_refs():
     metrics = _load("quality_metrics_pmi", "quality_metrics.py")
     valid = "#1=(LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.));\n#2=DATUM('A','A',#1);"

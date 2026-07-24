@@ -120,6 +120,57 @@ def test_specialized_contracts_represent_required_kinds(prompt, category, mode, 
     assert len(contract["contract_sha256"]) == 64
 
 
+def test_equipment_contract_contains_catalog_level_assembly_details():
+    contract = build_geometry_contract(_state(EQUIPMENT_PROMPT, "equipment"), "equipment", EQUIPMENT_MODE)
+    kind_counts: dict[str, int] = {}
+    for item in contract["components"]:
+        kind = item["kind"]
+        kind_counts[kind] = kind_counts.get(kind, 0) + 1
+
+    assert kind_counts["conveyor_side_rail"] == 2
+    assert kind_counts["conveyor_support_leg"] == 4
+    assert kind_counts["camera_lens"] == 2
+    assert kind_counts["camera_optic"] == 1
+    assert kind_counts["safety_door_frame"] == 4
+    assert kind_counts["safety_door_handle"] == 1
+    assert kind_counts["safety_door_hinge"] == 2
+    assert kind_counts["control_panel_door"] == 1
+    assert kind_counts["hmi_screen"] == 1
+    assert kind_counts["panel_handle"] == 1
+    assert kind_counts["emergency_stop"] == 1
+    assert kind_counts["status_button"] == 2
+    assert all(item["passed"] for item in contract["requirement_coverage"]["assembly_details"])
+
+    camera_coverage = next(
+        item for item in contract["requirement_coverage"]["components"]
+        if item["id"] == "vision_camera"
+    )
+    assert camera_coverage["required"] == 1
+    assert camera_coverage["passed"] is True
+
+
+def test_vision_inspection_cell_uses_externalized_layout_without_removing_standard_mode():
+    inspection = build_geometry_contract(_state(EQUIPMENT_PROMPT, "equipment"), "equipment", EQUIPMENT_MODE)
+    standard = build_geometry_contract(
+        _state("폭 1600mm 깊이 1000mm 높이 1800mm 일반 포장 설비와 컨베이어", "equipment"),
+        "equipment",
+        EQUIPMENT_MODE,
+    )
+
+    assert inspection["parameters"]["layout_variant"] == "vision_inspection_cell"
+    assert standard["parameters"]["layout_variant"] == "standard_cell"
+
+    inspection_by_id = {item["id"]: item for item in inspection["components"]}
+    conveyor = inspection_by_id["conveyor_1"]
+    control_panel = inspection_by_id["control_panel_1"]
+    camera = inspection_by_id["vision_camera_1"]
+    cell = inspection["parameters"]["cell_envelope"]
+
+    assert conveyor["size_mm"][1] > conveyor["size_mm"][0]
+    assert control_panel["center_mm"][0] > cell["right"]
+    assert camera["center_mm"][2] > cell["top"]
+
+
 def test_part_contract_contains_exact_requested_feature_counts():
     contract = build_geometry_contract(_state(PART_PROMPT, "part"), "part", PART_MODE)
     counts: dict[str, int] = {}

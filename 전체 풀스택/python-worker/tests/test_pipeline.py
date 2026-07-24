@@ -21,6 +21,8 @@ def test_mock_pipeline(monkeypatch, tmp_path):
     )
     result_2d = pipeline.generate_2d(request_2d)
     assert len(result_2d["results"]) == 4
+    assert result_2d["analysis"]["image_requirements"]
+    assert result_2d["analysis"]["design_spec"]["category"] == "equipment"
     selected = result_2d["results"][0]
     request_3d = Generate3DRequest(
         project_id="PRJ-TEST",

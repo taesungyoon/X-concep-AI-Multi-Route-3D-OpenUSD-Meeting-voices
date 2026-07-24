@@ -13,6 +13,7 @@ from app.openscad_engine import _stl_to_glb, generate_openscad
     [
         ("폭 900mm, 깊이 60cm, 높이 1.2m 검사 프레임", (900, 600, 1200)),
         ("width 900mm, depth 600mm, height 1200mm inspection frame", (900, 600, 1200)),
+        ("1600mm width, 100cm depth, 1.8m height inspection frame", (1600, 1000, 1800)),
     ],
 )
 def test_design_state_recovers_labelled_dimensions_from_prompt(prompt, expected):
@@ -39,6 +40,42 @@ def test_structured_dimensions_take_precedence_over_prompt_values():
     )
 
     assert state["dimensions"] == {"width_mm": 1000.0, "depth_mm": 700.0, "height_mm": 1300.0, "length_mm": None}
+
+
+def test_saved_design_spec_components_override_generic_analysis_summary():
+    state = build_design_state(
+        project_id="PRJ-TEST",
+        revision=2,
+        prompt="1600mm width inspection equipment with 2 servo motors",
+        category="equipment",
+        selected_2d_id="CONCEPT-1",
+        source_analysis={
+            "main_components": ["base frame", "working unit"],
+            "design_spec": {
+                "components": [
+                    {
+                        "id": "servo_motor",
+                        "kind": "servo_motor",
+                        "name": "servo motor",
+                        "quantity": 2,
+                        "required": True,
+                        "source": "prompt",
+                    }
+                ]
+            },
+        },
+    )
+
+    assert state["components"] == [
+        {
+            "id": "servo_motor",
+            "kind": "servo_motor",
+            "name": "servo motor",
+            "quantity": 2,
+            "required": True,
+            "source": "prompt",
+        }
+    ]
 
 
 def test_openscad_stl_millimetres_are_exported_as_glb_metres(tmp_path):

@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-MODULE_DUAL_SERVO_003", "source": {"format": "xconcep_parametric", "sha256": "f697cc4bd276b49cc4a5ea09bbc1e8112dc275150b2b8e6efcde00a466920f0e"}, "label": {"category": "module"}, "split": "eval", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

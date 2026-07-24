@@ -1,0 +1,54 @@
+services:
+  trainer:
+    profiles: ["training"]
+    build:
+      context: .
+      args:
+        PYTORCH_IMAGE: ${PYTORCH_IMAGE:-pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel}
+    gpus: all
+    ipc: host
+    shm_size: "32gb"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HF_HOME: /workspace/hf-cache
+      TOKENIZERS_PARALLELISM: "false"
+    volumes:
+      - ./data:/workspace/data:ro
+      - ./outputs:/workspace/outputs
+      - ./hf-cache:/workspace/hf-cache
+    command: ["--config", "${TRAIN_CONFIG:-/workspace/configs/qwen3-vl-4b-qlora.json}"]
+
+  verifier:
+    profiles: ["serve"]
+    build:
+      context: .
+      args:
+        PYTORCH_IMAGE: ${PYTORCH_IMAGE:-pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel}
+    gpus: all
+    ipc: host
+    shm_size: "16gb"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HF_HOME: /workspace/hf-cache
+      VLM_MODEL: ${VLM_MODEL:-/workspace/outputs/qwen3-vl-4b-designspec}
+      VLM_API_KEY: ${VLM_API_KEY:-}
+      VLM_LOAD_IN_4BIT: ${VLM_LOAD_IN_4BIT:-true}
+      VLM_MAX_NEW_TOKENS: ${VLM_MAX_NEW_TOKENS:-1024}
+      VLM_MAX_IMAGE_BYTES: ${VLM_MAX_IMAGE_BYTES:-20971520}
+    volumes:
+      - ./outputs:/workspace/outputs:ro
+      - ./hf-cache:/workspace/hf-cache
+    ports:
+      - "${VLM_HOST_PORT:-8191}:8191"
+    entrypoint: ["python", "scripts/serve_vlm.py"]
+    command: ["--host", "0.0.0.0", "--port", "8191"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8191/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s

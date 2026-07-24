@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xconcep.local/schemas/geometry.schema.json",
+  "title": "CAD AI Geometry",
+  "type": "object",
+  "required": ["schema_version", "sample_id", "source", "parser_mode", "entity_counts", "normalization", "provenance"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "sample_id": {"type": "string", "pattern": "^CAD-[A-F0-9]{12}$"},
+    "source": {
+      "type": "object",
+      "required": ["format", "original_filename", "sha256", "size_bytes"],
+      "properties": {
+        "format": {"enum": ["dxf", "step"]},
+        "original_filename": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "parser_mode": {"type": "string"},
+    "entity_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "bbox": {"type": ["object", "null"]},
+    "normalization": {"type": "object"},
+    "provenance": {"type": "object"}
+  }
+}

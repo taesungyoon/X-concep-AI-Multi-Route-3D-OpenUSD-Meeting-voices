@@ -218,9 +218,15 @@ class GPTImageClient:
 
     def _verify_semantics(self, image_bytes: bytes, requirements: list[dict[str, Any]]) -> dict[str, Any]:
         timeout = httpx.Timeout(float(self.settings.image_semantic_verifier_timeout_seconds), connect=10.0)
+        headers = (
+            {"Authorization": f"Bearer {self.settings.image_semantic_verifier_api_key}"}
+            if self.settings.image_semantic_verifier_api_key
+            else {}
+        )
         with httpx.Client(timeout=timeout) as client:
             response = client.post(
                 f"{self.settings.image_semantic_verifier_url}/verify",
+                headers=headers,
                 json={
                     "image_base64": base64.b64encode(image_bytes).decode("ascii"),
                     "requirements": requirements,

@@ -16,6 +16,56 @@ Never convert an uncertain statement into a confirmed fact.
 Create generation_prompt as a concise but complete Korean prompt for industrial 2D concept generation.
 Create usd_metadata values for OpenUSD custom attributes and revision notes."""
 
+MEETING_COMPONENT_ALIASES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("서보모터", ("서보모터", "서보 모터", "servo motor", "servo")),
+    ("안전커버", ("안전커버", "안전 커버", "투명 커버", "safety cover")),
+    ("안전도어", ("안전도어", "안전 도어", "안전문", "safety door")),
+    ("제어반", ("제어반", "제어 패널", "control panel", "control cabinet")),
+    ("비전 카메라", ("비전 카메라", "비전카메라", "vision camera")),
+    ("컨베이어", ("컨베이어", "conveyor")),
+    ("리니어 가이드", ("리니어 가이드", "리니어가이드", "linear guide", "linear rail")),
+    ("실린더", ("실린더", "cylinder")),
+    ("센서", ("센서", "sensor")),
+    ("라이트커튼", ("라이트커튼", "라이트 커튼", "light curtain")),
+    ("전면 투입", ("전면 투입", "front loading")),
+    ("90도", ("90도", "90 degree")),
+    ("단일 유닛", ("단일 유닛", "single unit")),
+)
+
+KOREAN_DIGITS = {
+    "영": 0, "공": 0, "일": 1, "이": 2, "삼": 3, "사": 4,
+    "오": 5, "육": 6, "칠": 7, "팔": 8, "구": 9,
+}
+KOREAN_SMALL_UNITS = {"십": 10, "백": 100, "천": 1000}
+
+
+def _dimension_number(value: str) -> int | None:
+    """Parse digits or common Sino-Korean spoken dimension numbers."""
+    token = re.sub(r"\s+", "", value).strip()
+    if token.isdigit():
+        return int(token)
+    if not token or any(
+        char not in KOREAN_DIGITS and char not in KOREAN_SMALL_UNITS and char != "만"
+        for char in token
+    ):
+        return None
+
+    total = 0
+    section = 0
+    digit: int | None = None
+    for char in token:
+        if char in KOREAN_DIGITS:
+            digit = KOREAN_DIGITS[char]
+        elif char in KOREAN_SMALL_UNITS:
+            section += (1 if digit is None else digit) * KOREAN_SMALL_UNITS[char]
+            digit = None
+        elif char == "만":
+            total += (section + (digit or 0) or 1) * 10000
+            section = 0
+            digit = None
+    parsed = total + section + (digit or 0)
+    return parsed if parsed > 0 else None
+
 
 class MeetingAnalyzer:
     def __init__(self, settings: Settings):
@@ -28,7 +78,7 @@ class MeetingAnalyzer:
         previous_analysis: dict[str, Any] | None = None,
         retrieval_context: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        if self.settings.llm_mode == "mock":
+        if self.settings.llm_mode in {"mock", "rules"}:
             return self._fallback(transcript, category, previous_analysis)
         schema = {
             "summary": "string",
@@ -106,19 +156,22 @@ class MeetingAnalyzer:
     def _fallback(transcript: str, category: str, previous: dict[str, Any] | None) -> dict[str, Any]:
         compact = " ".join(transcript.split())
         dims = {"width_mm": None, "depth_mm": None, "height_mm": None}
+        # Whisper may emit either "1200" or its spoken form "천이백".
+        number = r"(\d{2,5}|[영공일이삼사오육칠팔구십백천만\s]{1,14})"
         patterns = {
-            "width_mm": r"(?:폭|가로)\s*(?:은|를|:)?\s*(\d{2,5})\s*(?:mm|밀리미터)?",
-            "depth_mm": r"(?:깊이|세로)\s*(?:은|를|:)?\s*(\d{2,5})\s*(?:mm|밀리미터)?",
-            "height_mm": r"(?:높이)\s*(?:은|를|:)?\s*(\d{2,5})\s*(?:mm|밀리미터)?",
+            "width_mm": rf"(?:폭|가로)\s*(?:은|를|:)?\s*{number}\s*(?:mm|밀리미터)?",
+            "depth_mm": rf"(?:깊이|세로)\s*(?:은|를|:)?\s*{number}\s*(?:mm|밀리미터)?",
+            "height_mm": rf"(?:높이)\s*(?:은|를|:)?\s*{number}\s*(?:mm|밀리미터)?",
         }
         for key, pattern in patterns.items():
             match = re.search(pattern, compact, re.IGNORECASE)
             if match:
-                dims[key] = int(match.group(1))
+                dims[key] = _dimension_number(match.group(1))
         requirements = []
-        for keyword in ["서보모터", "안전커버", "제어반", "전면 투입", "90도", "단일 유닛", "비전 카메라", "컨베이어"]:
-            if keyword in compact:
-                requirements.append(keyword)
+        compact_lower = compact.lower()
+        for label, aliases in MEETING_COMPONENT_ALIASES:
+            if any(alias.lower() in compact_lower for alias in aliases):
+                requirements.append(label)
         unresolved = []
         dimension_labels = {"width_mm": "폭", "depth_mm": "깊이", "height_mm": "높이"}
         uncertainty_words = ("미정", "추후", "다음 회의", "나중", "확정 필요", "검토 필요")

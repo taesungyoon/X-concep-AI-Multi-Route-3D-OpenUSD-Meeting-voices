@@ -1,0 +1,19 @@
+{
+  "schema": "xconcep.cad-vlm-manifest/1.0",
+  "record_count": 9,
+  "categories": {
+    "equipment": 3,
+    "module": 3,
+    "part": 3
+  },
+  "splits": {
+    "eval": 3,
+    "train": 6
+  },
+  "views_per_record": [
+    "php_observed"
+  ],
+  "target_default": "design_spec",
+  "gold_evaluation_example": "gold_eval_predictions.example.jsonl",
+  "note": "Examples verify the pipeline only; they are not sufficient for production training."
+}

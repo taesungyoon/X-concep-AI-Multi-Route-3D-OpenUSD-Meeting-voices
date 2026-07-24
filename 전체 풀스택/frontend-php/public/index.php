@@ -68,7 +68,7 @@ try {
     <div class="system-strip" id="systemStrip">
         <span><i></i> ComfyUI · FLUX Local</span>
         <span><i></i> OpenAI Images Optional</span>
-        <span><i></i> Gemma 4 Local · vLLM/Ray</span>
+        <span><i></i> Requirement Engine · Local / vLLM</span>
         <span><i></i> Local Speech</span>
         <span><i></i> TripoSR Local</span>
         <span><i></i> OpenSCAD Structure</span>
@@ -155,7 +155,7 @@ try {
 
             <section class="meeting-workspace" id="meetingModePanel" hidden>
                 <div class="meeting-head">
-                    <div><span class="eyebrow">LOCAL MEETING AGENT</span><h2>회의 내용을 듣고 설계 요구사항을 정리함</h2><p>음성은 로컬 STT와 Gemma vLLM/Ray에서 처리하고, 분석 결과만 2D·3D 생성 파이프라인에 연결함</p></div>
+                    <div><span class="eyebrow">LOCAL MEETING AGENT</span><h2>회의 내용을 듣고 설계 요구사항을 정리함</h2><p>음성은 로컬 STT로 전사하고, 선택한 요구사항 분석 엔진의 결과를 2D·3D 생성 파이프라인에 연결함</p></div>
                     <span class="meeting-live" id="meetingLiveBadge">대기</span>
                 </div>
                 <div class="meeting-grid">
@@ -181,7 +181,7 @@ try {
                     </div>
 
                     <div class="panel meeting-analysis-panel">
-                        <div class="panel-heading"><div><span class="number-chip">03</span><h2>Gemma가 요구사항을 구조화함</h2></div><span class="optional">vLLM · Ray</span></div>
+                        <div class="panel-heading"><div><span class="number-chip">03</span><h2>요구사항 분석기가 내용을 구조화함</h2></div><span class="optional">Local Rules · vLLM 선택</span></div>
                         <div class="analysis-cards" id="meetingAnalysisCards">
                             <div class="analysis-empty">회의 내용을 분석하면 확정 요구사항, 치수, 변경사항, 미확정 항목이 표시됨</div>
                         </div>
@@ -207,7 +207,7 @@ try {
             <div class="stage-title"><div><span class="eyebrow">STEP 3</span><h2>3D 렌더링 결과임</h2><p>마우스 또는 손가락으로 회전하고 필요한 파일을 내려받을 수 있음</p></div><button class="ghost-btn" id="newProjectButton">새로 만들기</button></div>
             <div class="result-layout">
                 <div class="viewer-card">
-                    <div class="viewer-toolbar"><span><i class="online-dot"></i> 3D VIEWER</span><div><button data-view="iso">ISO</button><button data-view="front">FRONT</button><button data-view="top">TOP</button><button id="fullscreenButton">전체화면</button></div></div>
+                    <div class="viewer-toolbar"><span><i class="online-dot"></i> 3D VIEWER</span><div><button class="active" data-view="iso" aria-pressed="true">ISO</button><button data-view="front" aria-pressed="false">FRONT</button><button data-view="top" aria-pressed="false">TOP</button><button id="fullscreenButton">전체화면</button></div></div>
                     <div id="viewer3d" class="viewer3d"><div class="viewer-placeholder"><span class="cube-loader"></span><strong>3D 모델 준비 중</strong></div></div>
                     <div class="viewer-help">드래그: 회전 · 휠/핀치: 확대 · 우클릭: 이동</div>
                 </div>

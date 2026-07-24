@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-EQUIPMENT_CAMERA_CELL_003", "source": {"format": "xconcep_parametric", "sha256": "646ab3e4f42f4f7bbe21732f263449f52ce172549c53467b4ce627e03380e810"}, "label": {"category": "equipment"}, "split": "eval", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

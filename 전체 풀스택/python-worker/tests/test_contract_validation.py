@@ -79,6 +79,7 @@ def test_partial_regeneration_replaces_only_requested_requirement_group():
     assert frame["preserved_marker"] == "keep"
     assert merged_servo["center_mm"][0] == previous_servo["center_mm"][0] + 25.0
     assert merged["partial_regeneration"]["applied"] is True
+    assert merged["partial_regeneration"]["regenerated_requirement_ids"] == ["servo_motor"]
     assert "frame_post_1" in merged["partial_regeneration"]["preserved_component_ids"]
     assert "servo_motor_1" in merged["partial_regeneration"]["regenerated_component_ids"]
     assert all(item["passed"] for item in merged["requirement_coverage"]["components"])

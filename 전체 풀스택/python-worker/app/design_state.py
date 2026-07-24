@@ -1,3 +1,10 @@
+"""Build the revisioned DesignState shared by every generation route.
+
+The state normalizes prompt/meeting analysis into millimetres, components,
+visual intent, and a stable design ID. OpenSCAD, Blender, validation, OpenUSD,
+and training targets must derive from this contract instead of reparsing text.
+"""
+
 from __future__ import annotations
 
 import hashlib
@@ -7,12 +14,14 @@ from typing import Any
 
 from .parametric_generators import build_design_spec
 
+# Safe category baselines used only when analysis supplies no components.
 DEFAULT_COMPONENTS = {
     "equipment": ["base_frame", "work_unit", "drive_unit", "control_box", "safety_cover"],
     "module": ["base_plate", "drive_unit", "working_jig", "sensor_mount"],
     "part": ["main_body", "mounting_holes", "functional_surface"],
 }
 
+# Normalize Korean/English color words before appearance evaluation.
 COLOR_ALIASES = {
     "파랑": "blue", "블루": "blue", "blue": "blue",
     "검정": "black", "블랙": "black", "black": "black",
@@ -55,8 +64,8 @@ def _normalize_dimensions(source: dict[str, Any] | None) -> dict[str, float | No
     return result
 
 
-def _extract_prompt_dimensions(prompt: str) -> dict[str, float | None]:
-    """Extract deterministic labelled dimensions when an LLM omits them."""
+def extract_prompt_dimensions(prompt: str) -> dict[str, float | None]:
+    """Extract deterministic labelled dimensions in either natural word order."""
     aliases = {
         "width_mm": r"(?:폭|가로|width|wide)",
         "depth_mm": r"(?:깊이|세로|depth|deep)",
@@ -65,11 +74,19 @@ def _extract_prompt_dimensions(prompt: str) -> dict[str, float | None]:
     }
     result: dict[str, float | None] = {key: None for key in aliases}
     for key, label in aliases.items():
+        number = r"([0-9][0-9,]*(?:\.[0-9]+)?)"
+        unit = r"(mm|cm|m|밀리미터|센티미터|미터)?"
         match = re.search(
-            rf"{label}\s*(?:은|는|을|를|:|=)?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(mm|cm|m|밀리미터|센티미터|미터)?",
+            rf"{label}\s*(?:은|는|을|를|:|=)?\s*{number}\s*{unit}",
             prompt,
             re.IGNORECASE,
         )
+        if not match:
+            match = re.search(
+                rf"{number}\s*{unit}\s*(?:의\s*)?{label}",
+                prompt,
+                re.IGNORECASE,
+            )
         if not match:
             continue
         value = float(match.group(1).replace(",", ""))
@@ -81,7 +98,9 @@ def _extract_prompt_dimensions(prompt: str) -> dict[str, float | None]:
 
 def _normalize_components(source: dict[str, Any] | None, category: str) -> list[dict[str, Any]]:
     source = source or {}
-    raw = source.get("main_components") or source.get("components") or []
+    design_spec = source.get("design_spec") if isinstance(source.get("design_spec"), dict) else {}
+    structured = design_spec.get("components") if isinstance(design_spec.get("components"), list) else []
+    raw = structured or source.get("main_components") or source.get("components") or []
     if isinstance(raw, str):
         raw = [item.strip() for item in re.split(r"[,/\n]", raw) if item.strip()]
     result: list[dict[str, Any]] = []
@@ -145,6 +164,7 @@ def build_design_state(
     meeting_analysis: dict[str, Any] | None = None,
     previous_design_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Merge current inputs and prior revision into the canonical design contract."""
     merged: dict[str, Any] = {}
     for source in (source_analysis or {}, meeting_analysis or {}):
         for key, value in source.items():
@@ -152,7 +172,7 @@ def build_design_state(
                 merged[key] = value
 
     dimensions = _normalize_dimensions(merged)
-    prompt_dimensions = _extract_prompt_dimensions(prompt)
+    prompt_dimensions = extract_prompt_dimensions(prompt)
     for key, value in prompt_dimensions.items():
         if dimensions.get(key) is None and value is not None:
             dimensions[key] = value
@@ -171,6 +191,11 @@ def build_design_state(
         safety = [safety]
     if isinstance(unresolved, str):
         unresolved = [unresolved]
+    if all(dimensions.get(key) is not None for key in ("width_mm", "depth_mm", "height_mm")):
+        unresolved = [
+            item for item in unresolved
+            if "정확한 치수" not in str(item) and "exact dimension" not in str(item).lower()
+        ]
 
     state = {
         "schema_version": "2.0",

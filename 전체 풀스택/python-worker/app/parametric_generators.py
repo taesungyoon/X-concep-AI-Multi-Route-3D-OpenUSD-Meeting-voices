@@ -1,3 +1,11 @@
+"""Deterministic OpenSCAD-oriented parametric generation contracts.
+
+The legacy generic ``openscad`` mode remains available. Specialized
+``part``, ``module``, and ``equipment`` modes convert DesignState into explicit
+components/features, support scoped regeneration, and emit reproducible SCAD.
+All geometry dimensions use millimetres and a Z-up coordinate convention.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -10,7 +18,10 @@ from typing import Any
 from .generator import Part
 
 
-GENERATOR_VERSION = "1.0.0"
+# Increment when contract geometry changes so datasets/artifacts remain traceable.
+GENERATOR_VERSION = "1.2.0"
+
+# Public route values used by the UI, router, persisted plans, and training data.
 GENERIC_MODE = "openscad"
 AUTO_MODE = "openscad_auto"
 PART_MODE = "openscad_part"
@@ -18,6 +29,25 @@ MODULE_MODE = "openscad_module"
 EQUIPMENT_MODE = "openscad_equipment"
 OPENSCAD_GENERATOR_MODES = {GENERIC_MODE, AUTO_MODE, PART_MODE, MODULE_MODE, EQUIPMENT_MODE}
 SPECIALIZED_MODES = {PART_MODE, MODULE_MODE, EQUIPMENT_MODE}
+
+# Minimum visual/detail evidence expected for common industrial subassemblies.
+EQUIPMENT_DETAIL_EXPECTATIONS: dict[str, tuple[tuple[str, int], ...]] = {
+    "conveyor": (
+        ("conveyor_side_rail", 2),
+        ("conveyor_support_leg", 4),
+    ),
+    "vision_camera": (("camera_lens", 2),),
+    "control_panel": (
+        ("control_panel_door", 1),
+        ("hmi_screen", 1),
+        ("panel_handle", 1),
+        ("emergency_stop", 1),
+    ),
+    "safety_door": (
+        ("safety_door_frame", 4),
+        ("safety_door_handle", 1),
+    ),
+}
 
 MODE_FOR_CATEGORY = {
     "part": PART_MODE,
@@ -30,7 +60,7 @@ COMPONENT_ALIASES: dict[str, tuple[str, ...]] = {
     "servo_motor": ("서보모터", "서보 모터", "servo motor", "servo"),
     "vision_camera": ("비전 카메라", "비전카메라", "vision camera", "camera", "카메라"),
     "control_panel": ("제어반", "control panel", "control cabinet"),
-    "safety_door": ("안전도어", "안전 도어", "safety door"),
+    "safety_door": ("안전도어", "안전 도어", "안전문", "safety door"),
     "safety_cover": ("안전커버", "안전 커버", "safety cover", "투명 커버"),
     "linear_guide": ("리니어 가이드", "리니어가이드", "linear guide", "linear rail"),
     "cylinder": ("실린더", "cylinder"),
@@ -56,6 +86,7 @@ COUNT_WORDS = {
 
 
 def resolve_generator_mode(requested_mode: str | None, category: str) -> str:
+    """Resolve auto mode by category while preserving the generic fallback."""
     mode = requested_mode or GENERIC_MODE
     if mode == AUTO_MODE:
         return MODE_FOR_CATEGORY[category]
@@ -119,7 +150,7 @@ def _part_mount_target_kinds(prompt: str) -> set[str]:
             continue
         if any(
             re.search(
-                rf"{re.escape(alias.lower())}\s*(?:용\s*)?(?:브래킷|브라켓|홀|마운트|거치대|bracket|hole|mount|holder)",
+                rf"{re.escape(alias.lower())}\s*(?:용\s*)?[\w가-힣 -]{{0,20}}?(?:브래킷|브라켓|홀|마운트|거치대|bracket|hole|mount|holder)",
                 lower,
             )
             for alias in aliases
@@ -129,6 +160,7 @@ def _part_mount_target_kinds(prompt: str) -> set[str]:
 
 
 def build_design_spec(design_state: dict[str, Any], category: str) -> dict[str, Any]:
+    """Normalize requirements into deterministic component/feature quantities."""
     prompt = str(design_state.get("source_prompt") or "")
     mount_target_kinds = _part_mount_target_kinds(prompt) if category == "part" else set()
     detected: list[dict[str, Any]] = []
@@ -376,15 +408,22 @@ def _module_contract(spec: dict[str, Any], overall: dict[str, float]) -> tuple[l
         x = (-w * 0.26) + index * min(w * 0.26, 130.0)
         components.append(_box(f"servo_motor_{index + 1}", "servo_motor", (90.0, 90.0, 110.0), (x, -d * 0.34, plate + 55.0), "industrial_black", "servo_motor"))
     components.append(_box("working_jig", "working_jig", (w * 0.30, d * 0.30, h * 0.16), (w * 0.12, 0, plate + rail_h + h * 0.08), "industrial_blue", "working_jig"))
-    sensor_count = _quantity(spec, "sensor", "vision_camera", default=1)
+    sensor_count = _quantity(spec, "sensor", default=0)
+    vision_count = _quantity(spec, "vision_camera", default=0)
+    if sensor_count == 0 and vision_count == 0:
+        sensor_count = 1
     for index in range(sensor_count):
         x = (index - (sensor_count - 1) / 2) * 70.0
         components.append(_box(f"sensor_{index + 1}", "sensor", (45.0, 35.0, 35.0), (x, d * 0.12, h * 0.58), "sensor_black", "sensor"))
         components.append(_box(f"sensor_mount_{index + 1}", "sensor_mount", (20.0, 20.0, h * 0.42), (x, d * 0.12, h * 0.36), "painted_steel", "sensor"))
+    for index in range(vision_count):
+        x = (index - (vision_count - 1) / 2) * 90.0
+        components.append(_box(f"vision_camera_{index + 1}", "vision_camera", (70.0, 55.0, 50.0), (x, d * 0.12, h * 0.60), "sensor_black", "vision_camera"))
+        components.append(_box(f"camera_mount_{index + 1}", "camera_mount", (24.0, 24.0, h * 0.44), (x, d * 0.12, h * 0.37), "painted_steel", "vision_camera"))
     return components, [], {"base_plate_thickness": plate, "rail_width": rail_w, "rail_height": rail_h, "support_profile": support}
 
 
-def _equipment_contract(spec: dict[str, Any], overall: dict[str, float]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, float]]:
+def _equipment_standard_contract(spec: dict[str, Any], overall: dict[str, float]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, float]]:
     w, d, h = overall["width"], overall["depth"], overall["height"]
     profile = max(30.0, min(w, d, h) * 0.035)
     x, y = w / 2 - profile / 2, d / 2 - profile / 2
@@ -400,10 +439,41 @@ def _equipment_contract(spec: dict[str, Any], overall: dict[str, float]) -> tupl
         ])
 
     if _quantity(spec, "conveyor", default=1):
-        components.append(_box("conveyor_1", "conveyor", (w * 0.66, d * 0.34, max(80.0, h * 0.06)), (-w * 0.04, 0, h * 0.42), "conveyor_steel", "conveyor"))
+        conveyor_w = w * 0.66
+        conveyor_d = d * 0.34
+        conveyor_h = max(80.0, h * 0.06)
+        conveyor_x = -w * 0.04
+        conveyor_z = h * 0.42
+        components.append(_box("conveyor_1", "conveyor", (conveyor_w, conveyor_d, conveyor_h), (conveyor_x, 0, conveyor_z), "conveyor_steel", "conveyor"))
         for index in range(6):
             rx = -w * 0.28 + index * (w * 0.56 / 5)
             components.append(_cylinder(f"conveyor_roller_{index + 1}", "conveyor_roller", max(24.0, h * 0.025), d * 0.30, (rx, 0, h * 0.46), "Y", "conveyor_roller", "conveyor"))
+        rail_h = max(50.0, h * 0.035)
+        rail_t = max(18.0, profile * 0.55)
+        for index, rail_y in enumerate((-conveyor_d * 0.47, conveyor_d * 0.47), start=1):
+            components.append(_box(
+                f"conveyor_side_rail_{index}",
+                "conveyor_side_rail",
+                (conveyor_w, rail_t, rail_h),
+                (conveyor_x, rail_y, conveyor_z + conveyor_h / 2 + rail_h / 2),
+                "brushed_aluminum",
+                "conveyor",
+            ))
+        leg_h = max(120.0, conveyor_z - conveyor_h / 2)
+        for index, (leg_x, leg_y) in enumerate((
+            (conveyor_x - conveyor_w * 0.36, -conveyor_d * 0.34),
+            (conveyor_x - conveyor_w * 0.36, conveyor_d * 0.34),
+            (conveyor_x + conveyor_w * 0.36, -conveyor_d * 0.34),
+            (conveyor_x + conveyor_w * 0.36, conveyor_d * 0.34),
+        ), start=1):
+            components.append(_box(
+                f"conveyor_support_leg_{index}",
+                "conveyor_support_leg",
+                (profile, profile, leg_h),
+                (leg_x, leg_y, leg_h / 2),
+                "brushed_aluminum",
+                "conveyor",
+            ))
 
     motor_count = _quantity(spec, "servo_motor", "motor", default=1)
     for index in range(motor_count):
@@ -414,17 +484,248 @@ def _equipment_contract(spec: dict[str, Any], overall: dict[str, float]) -> tupl
         components.extend([
             _box("camera_mount", "camera_mount", (profile, profile, h * 0.32), (0, 0, h * 0.69), "painted_steel", "vision_camera"),
             _box("vision_camera_1", "vision_camera", (120.0, 90.0, 85.0), (0, 0, h * 0.84), "sensor_black", "vision_camera"),
-            _cylinder("camera_lens", "camera_lens", 46.0, 30.0, (0, -60.0, h * 0.84), "Y", "glass", "vision_camera"),
+            _cylinder("camera_lens_1", "camera_lens", 34.0, 30.0, (-28.0, -60.0, h * 0.84), "Y", "glass", "vision_camera"),
+            _cylinder("camera_lens_2", "camera_lens", 34.0, 30.0, (28.0, -60.0, h * 0.84), "Y", "glass", "vision_camera"),
         ])
 
-    if _quantity(spec, "safety_door", "safety_cover", default=1):
+    if _quantity(spec, "safety_door", default=0):
         door_h = h * 0.66
-        components.append(_box("front_safety_door", "safety_door", (w * 0.78, max(6.0, profile * 0.18), door_h), (0, -d / 2 + profile * 0.65, h * 0.56), "transparent_polycarbonate", "safety_door"))
+        door_w = w * 0.78
+        door_t = max(6.0, profile * 0.18)
+        door_y = -d / 2 + profile * 0.65
+        door_z = h * 0.56
+        door_frame = max(24.0, profile * 0.72)
+        components.append(_box("front_safety_door", "safety_door", (door_w, door_t, door_h), (0, door_y, door_z), "transparent_polycarbonate", "safety_door"))
+        components.extend([
+            _box("door_frame_left", "safety_door_frame", (door_frame, door_t * 1.7, door_h), (-door_w / 2 + door_frame / 2, door_y - door_t * 0.15, door_z), "brushed_aluminum", "safety_door"),
+            _box("door_frame_right", "safety_door_frame", (door_frame, door_t * 1.7, door_h), (door_w / 2 - door_frame / 2, door_y - door_t * 0.15, door_z), "brushed_aluminum", "safety_door"),
+            _box("door_frame_top", "safety_door_frame", (door_w, door_t * 1.7, door_frame), (0, door_y - door_t * 0.15, door_z + door_h / 2 - door_frame / 2), "brushed_aluminum", "safety_door"),
+            _box("door_frame_bottom", "safety_door_frame", (door_w, door_t * 1.7, door_frame), (0, door_y - door_t * 0.15, door_z - door_h / 2 + door_frame / 2), "brushed_aluminum", "safety_door"),
+            _box("door_handle", "safety_door_handle", (24.0, max(20.0, door_t * 3.0), 180.0), (door_w * 0.34, door_y - max(14.0, door_t * 1.5), door_z), "industrial_black", "safety_door"),
+        ])
+    if _quantity(spec, "safety_cover", default=0):
+        cover_t = max(5.0, profile * 0.16)
+        cover_h = h * 0.66
+        cover_z = h * 0.56
+        components.extend([
+            _box("safety_cover_left", "safety_cover", (cover_t, d * 0.78, cover_h), (-w / 2 + profile * 0.65, 0, cover_z), "transparent_polycarbonate", "safety_cover"),
+            _box("safety_cover_right", "safety_cover", (cover_t, d * 0.78, cover_h), (w / 2 - profile * 0.65, 0, cover_z), "transparent_polycarbonate", "safety_cover"),
+            _box("safety_cover_rear", "safety_cover", (w * 0.78, cover_t, cover_h), (0, d / 2 - profile * 0.65, cover_z), "transparent_polycarbonate", "safety_cover"),
+        ])
     if _quantity(spec, "control_panel", default=1):
         panel_w, panel_d, panel_h = w * 0.18, d * 0.28, h * 0.48
-        components.append(_box("control_panel_1", "control_panel", (panel_w, panel_d, panel_h), (w / 2 - profile - panel_w / 2, 0, panel_h / 2), "control_gray", "control_panel"))
+        panel_x = w / 2 - profile - panel_w / 2
+        panel_front_y = -panel_d / 2
+        components.extend([
+            _box("control_panel_1", "control_panel", (panel_w, panel_d, panel_h), (panel_x, 0, panel_h / 2), "control_gray", "control_panel"),
+            _box("control_panel_door", "control_panel_door", (panel_w * 0.86, max(8.0, profile * 0.28), panel_h * 0.88), (panel_x, panel_front_y - max(4.0, profile * 0.14), panel_h * 0.50), "painted_steel", "control_panel"),
+            _box("hmi_screen", "hmi_screen", (panel_w * 0.52, max(8.0, profile * 0.34), panel_h * 0.22), (panel_x, panel_front_y - max(10.0, profile * 0.31), panel_h * 0.67), "hmi_blue", "control_panel"),
+            _box("panel_handle", "panel_handle", (20.0, max(18.0, profile * 0.60), panel_h * 0.20), (panel_x + panel_w * 0.34, panel_front_y - max(16.0, profile * 0.46), panel_h * 0.40), "industrial_black", "control_panel"),
+            _cylinder("emergency_stop", "emergency_stop", max(34.0, profile), max(18.0, profile * 0.60), (panel_x - panel_w * 0.27, panel_front_y - max(18.0, profile * 0.54), panel_h * 0.45), "Y", "emergency_red", "control_panel"),
+        ])
 
-    return components, [], {"frame_profile": profile}
+    return components, [], {"frame_profile": profile, "layout_variant": "standard_cell"}
+
+
+def _inspection_cell_contract(spec: dict[str, Any], overall: dict[str, float]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, float]]:
+    """Vision-inspection cell with an external cabinet and front conveyor."""
+    w, d, h = overall["width"], overall["depth"], overall["height"]
+    profile = max(30.0, min(w, d, h) * 0.032)
+    cell_left = -w / 2
+    cell_right = w * 0.22
+    cell_front = -d * 0.22
+    cell_back = d / 2
+    cell_width = cell_right - cell_left
+    cell_depth = cell_back - cell_front
+    cell_center_x = (cell_left + cell_right) / 2
+    cell_center_y = (cell_front + cell_back) / 2
+    cell_top = h * 0.78
+    components: list[dict[str, Any]] = []
+
+    post_x = (cell_left + profile / 2, cell_right - profile / 2)
+    post_y = (cell_front + profile / 2, cell_back - profile / 2)
+    for index, (px, py) in enumerate(
+        ((post_x[0], post_y[0]), (post_x[1], post_y[0]), (post_x[0], post_y[1]), (post_x[1], post_y[1])),
+        start=1,
+    ):
+        components.append(
+            _box(
+                f"frame_post_{index}",
+                "frame",
+                (profile, profile, cell_top),
+                (px, py, cell_top / 2),
+                "aluminum_profile",
+                "frame",
+            )
+        )
+    for z, prefix in ((profile / 2, "bottom"), (cell_top - profile / 2, "top")):
+        components.extend([
+            _box(f"frame_{prefix}_front", "frame", (cell_width, profile, profile), (cell_center_x, post_y[0], z), "aluminum_profile", "frame"),
+            _box(f"frame_{prefix}_back", "frame", (cell_width, profile, profile), (cell_center_x, post_y[1], z), "aluminum_profile", "frame"),
+            _box(f"frame_{prefix}_left", "frame", (profile, cell_depth, profile), (post_x[0], cell_center_y, z), "aluminum_profile", "frame"),
+            _box(f"frame_{prefix}_right", "frame", (profile, cell_depth, profile), (post_x[1], cell_center_y, z), "aluminum_profile", "frame"),
+        ])
+    lower_beam_z = h * 0.34
+    components.extend([
+        _box("frame_mid_front", "frame", (cell_width, profile, profile), (cell_center_x, post_y[0], lower_beam_z), "aluminum_profile", "frame"),
+        _box("frame_mid_back", "frame", (cell_width, profile, profile), (cell_center_x, post_y[1], lower_beam_z), "aluminum_profile", "frame"),
+    ])
+
+    if _quantity(spec, "conveyor", default=1):
+        conveyor_w = cell_width * 0.54
+        conveyor_d = d * 0.78
+        conveyor_h = max(80.0, h * 0.055)
+        conveyor_x = cell_center_x - cell_width * 0.08
+        conveyor_y = -d * 0.11
+        conveyor_z = h * 0.38
+        components.append(
+            _box("conveyor_1", "conveyor", (conveyor_w, conveyor_d, conveyor_h), (conveyor_x, conveyor_y, conveyor_z), "conveyor_steel", "conveyor")
+        )
+        for index in range(6):
+            roller_y = conveyor_y - conveyor_d * 0.38 + index * (conveyor_d * 0.76 / 5)
+            components.append(
+                _cylinder(
+                    f"conveyor_roller_{index + 1}",
+                    "conveyor_roller",
+                    max(24.0, h * 0.024),
+                    conveyor_w * 0.90,
+                    (conveyor_x, roller_y, conveyor_z + conveyor_h * 0.63),
+                    "X",
+                    "conveyor_roller",
+                    "conveyor",
+                )
+            )
+        rail_h = max(50.0, h * 0.035)
+        rail_t = max(18.0, profile * 0.55)
+        for index, rail_x in enumerate((conveyor_x - conveyor_w * 0.48, conveyor_x + conveyor_w * 0.48), start=1):
+            components.append(
+                _box(
+                    f"conveyor_side_rail_{index}",
+                    "conveyor_side_rail",
+                    (rail_t, conveyor_d, rail_h),
+                    (rail_x, conveyor_y, conveyor_z + conveyor_h / 2 + rail_h / 2),
+                    "brushed_aluminum",
+                    "conveyor",
+                )
+            )
+        leg_h = max(120.0, conveyor_z - conveyor_h / 2)
+        for index, (leg_x, leg_y) in enumerate((
+            (conveyor_x - conveyor_w * 0.38, -d * 0.39),
+            (conveyor_x + conveyor_w * 0.38, -d * 0.39),
+            (conveyor_x - conveyor_w * 0.38, d * 0.14),
+            (conveyor_x + conveyor_w * 0.38, d * 0.14),
+        ), start=1):
+            components.append(
+                _box(
+                    f"conveyor_support_leg_{index}",
+                    "conveyor_support_leg",
+                    (profile, profile, leg_h),
+                    (leg_x, leg_y, leg_h / 2),
+                    "brushed_aluminum",
+                    "conveyor",
+                )
+            )
+
+    motor_count = _quantity(spec, "servo_motor", "motor", default=1)
+    for index in range(motor_count):
+        motor_y = -d * 0.24 + index * min(d * 0.22, 180.0)
+        components.append(
+            _box(
+                f"servo_motor_{index + 1}",
+                "servo_motor",
+                (110.0, 105.0, 120.0),
+                (cell_center_x + cell_width * 0.23, motor_y, h * 0.29),
+                "industrial_black",
+                "servo_motor",
+            )
+        )
+
+    if _quantity(spec, "vision_camera", default=1):
+        camera_z = h - 75.0
+        components.extend([
+            _box("camera_bridge", "camera_mount", (cell_width * 0.36, profile, profile), (cell_center_x, cell_center_y, cell_top + profile), "painted_steel", "vision_camera"),
+            _box("camera_mount", "camera_mount", (profile, profile, h * 0.13), (cell_center_x, cell_center_y, cell_top + h * 0.065), "painted_steel", "vision_camera"),
+            _box("vision_camera_1", "vision_camera", (150.0, 105.0, 150.0), (cell_center_x, cell_center_y, camera_z), "sensor_black", "vision_camera"),
+            _box("camera_sensor_left", "camera_sensor_module", (95.0, 90.0, 120.0), (cell_center_x - 125.0, cell_center_y, camera_z - 10.0), "sensor_black", "vision_camera"),
+            _box("camera_sensor_right", "camera_sensor_module", (95.0, 90.0, 120.0), (cell_center_x + 125.0, cell_center_y, camera_z - 10.0), "sensor_black", "vision_camera"),
+            _cylinder("camera_lens_1", "camera_lens", 42.0, 48.0, (cell_center_x - 125.0, cell_center_y - 64.0, camera_z - 10.0), "Y", "glass", "vision_camera"),
+            _cylinder("camera_lens_2", "camera_lens", 42.0, 48.0, (cell_center_x + 125.0, cell_center_y - 64.0, camera_z - 10.0), "Y", "glass", "vision_camera"),
+            _cylinder("inspection_optic", "camera_optic", 72.0, 100.0, (cell_center_x, cell_center_y, camera_z - 120.0), "Z", "glass", "vision_camera"),
+        ])
+
+    if _quantity(spec, "safety_door", default=0):
+        door_w = cell_width * 0.84
+        door_h = h * 0.36
+        door_t = max(6.0, profile * 0.18)
+        door_y = cell_front - door_t / 2
+        door_z = h * 0.57
+        door_frame = max(24.0, profile * 0.72)
+        components.append(_box("front_safety_door", "safety_door", (door_w, door_t, door_h), (cell_center_x, door_y, door_z), "transparent_polycarbonate", "safety_door"))
+        components.extend([
+            _box("door_frame_left", "safety_door_frame", (door_frame, door_t * 1.7, door_h), (cell_center_x - door_w / 2 + door_frame / 2, door_y - door_t * 0.15, door_z), "brushed_aluminum", "safety_door"),
+            _box("door_frame_right", "safety_door_frame", (door_frame, door_t * 1.7, door_h), (cell_center_x + door_w / 2 - door_frame / 2, door_y - door_t * 0.15, door_z), "brushed_aluminum", "safety_door"),
+            _box("door_frame_top", "safety_door_frame", (door_w, door_t * 1.7, door_frame), (cell_center_x, door_y - door_t * 0.15, door_z + door_h / 2 - door_frame / 2), "brushed_aluminum", "safety_door"),
+            _box("door_frame_bottom", "safety_door_frame", (door_w, door_t * 1.7, door_frame), (cell_center_x, door_y - door_t * 0.15, door_z - door_h / 2 + door_frame / 2), "brushed_aluminum", "safety_door"),
+            _box("door_handle", "safety_door_handle", (24.0, max(20.0, door_t * 3.0), 180.0), (cell_center_x + door_w * 0.34, door_y - max(14.0, door_t * 1.5), door_z), "industrial_black", "safety_door"),
+            _box("door_hinge_top", "safety_door_hinge", (28.0, max(22.0, door_t * 3.4), 70.0), (cell_center_x - door_w * 0.48, door_y - max(15.0, door_t * 1.7), door_z + door_h * 0.28), "industrial_black", "safety_door"),
+            _box("door_hinge_bottom", "safety_door_hinge", (28.0, max(22.0, door_t * 3.4), 70.0), (cell_center_x - door_w * 0.48, door_y - max(15.0, door_t * 1.7), door_z - door_h * 0.28), "industrial_black", "safety_door"),
+        ])
+    if _quantity(spec, "safety_cover", default=0):
+        cover_t = max(5.0, profile * 0.16)
+        cover_h = h * 0.42
+        cover_z = h * 0.56
+        components.extend([
+            _box("safety_cover_left", "safety_cover", (cover_t, cell_depth * 0.90, cover_h), (cell_left + profile * 0.65, cell_center_y, cover_z), "transparent_polycarbonate", "safety_cover"),
+            _box("safety_cover_right", "safety_cover", (cover_t, cell_depth * 0.90, cover_h), (cell_right - profile * 0.65, cell_center_y, cover_z), "transparent_polycarbonate", "safety_cover"),
+            _box("safety_cover_rear", "safety_cover", (cell_width * 0.90, cover_t, cover_h), (cell_center_x, cell_back - profile * 0.65, cover_z), "transparent_polycarbonate", "safety_cover"),
+        ])
+    if _quantity(spec, "control_panel", default=1):
+        panel_w, panel_d, panel_h = w * 0.18, d * 0.32, h * 0.58
+        panel_x = w / 2 - panel_w / 2
+        panel_y = -d * 0.08
+        panel_front_y = panel_y - panel_d / 2
+        components.extend([
+            _box("control_panel_1", "control_panel", (panel_w, panel_d, panel_h), (panel_x, panel_y, panel_h / 2), "control_gray", "control_panel"),
+            _box("control_panel_door", "control_panel_door", (panel_w * 0.86, max(8.0, profile * 0.28), panel_h * 0.88), (panel_x, panel_front_y - max(4.0, profile * 0.14), panel_h * 0.50), "painted_steel", "control_panel"),
+            _box("hmi_screen", "hmi_screen", (panel_w * 0.52, max(8.0, profile * 0.34), panel_h * 0.22), (panel_x, panel_front_y - max(10.0, profile * 0.31), panel_h * 0.67), "hmi_blue", "control_panel"),
+            _box("panel_handle", "panel_handle", (20.0, max(18.0, profile * 0.60), panel_h * 0.20), (panel_x + panel_w * 0.34, panel_front_y - max(16.0, profile * 0.46), panel_h * 0.40), "industrial_black", "control_panel"),
+            _cylinder("emergency_stop", "emergency_stop", max(34.0, profile), max(18.0, profile * 0.60), (panel_x - panel_w * 0.27, panel_front_y - max(18.0, profile * 0.54), panel_h * 0.45), "Y", "emergency_red", "control_panel"),
+            _cylinder("status_button_green", "status_button", 20.0, max(14.0, profile * 0.42), (panel_x - panel_w * 0.08, panel_front_y - max(17.0, profile * 0.50), panel_h * 0.45), "Y", "status_green", "control_panel"),
+            _cylinder("status_button_amber", "status_button", 20.0, max(14.0, profile * 0.42), (panel_x + panel_w * 0.08, panel_front_y - max(17.0, profile * 0.50), panel_h * 0.45), "Y", "status_amber", "control_panel"),
+        ])
+
+    return components, [], {
+        "frame_profile": profile,
+        "layout_variant": "vision_inspection_cell",
+        "cell_envelope": {
+            "left": cell_left,
+            "right": cell_right,
+            "front": cell_front,
+            "back": cell_back,
+            "top": cell_top,
+        },
+    }
+
+
+def _equipment_contract(
+    spec: dict[str, Any],
+    overall: dict[str, float],
+    source_prompt: str = "",
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, float]]:
+    normalized = source_prompt.lower()
+    inspection_terms = (
+        "vision inspection",
+        "visual inspection",
+        "vision camera",
+        "비전 검사",
+        "비전검사",
+        "비전 카메라",
+        "검사 설비",
+        "검사설비",
+    )
+    if any(term in normalized for term in inspection_terms):
+        return _inspection_cell_contract(spec, overall)
+    return _equipment_standard_contract(spec, overall)
 
 
 def _coverage(spec: dict[str, Any], components: list[dict[str, Any]], features: list[dict[str, Any]]) -> dict[str, Any]:
@@ -458,10 +759,36 @@ def _coverage(spec: dict[str, Any], components: list[dict[str, Any]], features: 
     for item in spec.get("relationships") or []:
         passed = str(item.get("subject")) in represented_kinds and str(item.get("object")) in represented_kinds
         relationship_rows.append({**item, "passed": passed})
-    return {"components": component_rows, "features": feature_rows, "relationships": relationship_rows}
+    detail_rows: list[dict[str, Any]] = []
+    concrete_kind_counts = Counter(str(item.get("kind") or "") for item in components)
+    required_component_kinds = {
+        str(item.get("kind"))
+        for item in spec.get("components") or []
+        if item.get("required", True)
+    }
+    for parent_kind, expectations in EQUIPMENT_DETAIL_EXPECTATIONS.items():
+        if parent_kind not in required_component_kinds:
+            continue
+        for detail_kind, required in expectations:
+            represented = int(concrete_kind_counts.get(detail_kind, 0))
+            detail_rows.append({
+                "id": f"{parent_kind}:{detail_kind}",
+                "parent": parent_kind,
+                "kind": detail_kind,
+                "required": required,
+                "represented": represented,
+                "passed": represented >= required,
+            })
+    return {
+        "components": component_rows,
+        "features": feature_rows,
+        "relationships": relationship_rows,
+        "assembly_details": detail_rows,
+    }
 
 
 def build_geometry_contract(design_state: dict[str, Any], category: str, generator_mode: str) -> dict[str, Any]:
+    """Create the versioned geometry contract consumed by SCAD and validation."""
     resolved_mode = resolve_generator_mode(generator_mode, category)
     if resolved_mode not in SPECIALIZED_MODES:
         raise ValueError(f"specialized OpenSCAD mode required, got {resolved_mode}")
@@ -472,7 +799,11 @@ def build_geometry_contract(design_state: dict[str, Any], category: str, generat
     elif resolved_mode == MODULE_MODE:
         components, features, parameters = _module_contract(spec, overall)
     else:
-        components, features, parameters = _equipment_contract(spec, overall)
+        components, features, parameters = _equipment_contract(
+            spec,
+            overall,
+            str(design_state.get("source_prompt") or ""),
+        )
     coverage = _coverage(spec, components, features)
     seed_source = f"{spec.get('source_prompt_hash')}:{resolved_mode}:{GENERATOR_VERSION}"
     deterministic_seed = int(hashlib.sha256(seed_source.encode("utf-8")).hexdigest()[:16], 16)
@@ -515,6 +846,7 @@ def apply_partial_regeneration(
     candidate_contract: dict[str, Any],
     regeneration_scope: list[str],
 ) -> dict[str, Any]:
+    """Replace only requested component scopes and retain unaffected geometry."""
     selected = {_scope_token(str(value)) for value in regeneration_scope if str(value).strip()}
     if not selected:
         raise ValueError("부분 재생성 범위가 비어 있음")
@@ -575,6 +907,7 @@ def apply_partial_regeneration(
     )
     candidate["partial_regeneration"] = {
         "requested_scope": sorted(selected),
+        "regenerated_requirement_ids": sorted(selected),
         "applied": True,
         "strategy": "replace_failed_requirement_groups",
         "base_contract_sha256": previous_contract.get("contract_sha256"),
@@ -635,6 +968,8 @@ def parts_from_contract(contract: dict[str, Any]) -> list[Part]:
         "conveyor_roller": (95, 100, 105, 255),
         "hardened_steel": (105, 112, 118, 255),
         "glass": (35, 62, 75, 255),
+        "hmi_blue": (16, 130, 202, 255),
+        "emergency_red": (210, 28, 35, 255),
     }
     parts: list[Part] = []
     for item in contract.get("components") or []:

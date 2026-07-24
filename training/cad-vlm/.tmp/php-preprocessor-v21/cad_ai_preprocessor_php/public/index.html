@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>CAD AI Dataset Studio</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">본문으로 이동</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="주 탐색">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">C</span>
+        <div>
+          <strong>CAD AI</strong>
+          <span>Dataset Studio</span>
+        </div>
+      </div>
+      <nav>
+        <a class="nav-item active" href="#dashboard">Overview</a>
+        <a class="nav-item" href="#upload">New dataset</a>
+        <a class="nav-item" href="#jobs">Processing jobs</a>
+        <a class="nav-item" href="#training">Baseline training</a>
+      </nav>
+      <div class="sidebar-note">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div>
+          <strong id="health-label">연결 확인 중</strong>
+          <span id="health-detail">local runtime</span>
+        </div>
+      </div>
+    </aside>
+
+    <main id="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">ENGINEERING DATA PIPELINE</p>
+          <h1>DXF·STEP을 학습 가능한 데이터로</h1>
+        </div>
+        <label class="api-key-field">
+          <span>API Key</span>
+          <input id="api-key" type="password" autocomplete="off" placeholder="선택 설정">
+        </label>
+      </header>
+
+      <section id="dashboard" class="hero">
+        <div>
+          <p class="hero-kicker">MULTIMODAL CAD PREPROCESSING</p>
+          <h2>구조와 형상을 잃지 않는<br>AI 데이터 준비 워크플로</h2>
+          <p class="hero-copy">원본 CAD, Geometry JSON, 미리보기, Point Cloud, 품질 보고서와 Manifest를 하나의 추적 가능한 패키지로 만듭니다.</p>
+          <a class="button primary" href="#upload">첫 파일 전처리</a>
+        </div>
+        <div class="pipeline-card" aria-label="처리 파이프라인">
+          <div class="pipeline-step complete"><span>01</span><div><strong>Validate</strong><small>signature · hash · size</small></div></div>
+          <div class="pipeline-line"></div>
+          <div class="pipeline-step complete"><span>02</span><div><strong>Parse</strong><small>DXF entities · STEP structure</small></div></div>
+          <div class="pipeline-line"></div>
+          <div class="pipeline-step active"><span>03</span><div><strong>Normalize</strong><small>coordinates · units · labels</small></div></div>
+          <div class="pipeline-line"></div>
+          <div class="pipeline-step"><span>04</span><div><strong>Package</strong><small>quality · manifest · model input</small></div></div>
+        </div>
+      </section>
+
+      <section class="metric-grid" aria-label="요약 지표">
+        <article><span>전체 작업</span><strong id="metric-total">0</strong><small>ingested samples</small></article>
+        <article><span>완료</span><strong id="metric-completed">0</strong><small>ready for dataset</small></article>
+        <article><span>평균 품질</span><strong id="metric-quality">—</strong><small>quality score</small></article>
+        <article><span>학습 실행</span><strong id="metric-training">0</strong><small>baseline models</small></article>
+      </section>
+
+      <section id="upload" class="section-grid">
+        <div class="section-heading">
+          <p class="eyebrow">NEW DATASET SAMPLE</p>
+          <h2>CAD 파일 등록</h2>
+          <p>DXF, STEP, STP 형식만 허용합니다. 파일명은 메타데이터로 보존하고 저장명은 서버에서 생성합니다.</p>
+        </div>
+        <form id="upload-form" class="card upload-card">
+          <label id="drop-zone" class="drop-zone">
+            <input id="cad-file" name="file" type="file" accept=".dxf,.step,.stp" required>
+            <span class="upload-icon" aria-hidden="true">↥</span>
+            <strong>파일을 놓거나 선택하세요</strong>
+            <small id="file-summary">DXF · STEP · STP / 최대 50 MB</small>
+          </label>
+          <div class="form-grid">
+            <label><span>카테고리</span><input id="category" name="category" maxlength="120" value="unlabeled" placeholder="예: bracket"></label>
+            <label><span>프로젝트 그룹</span><input id="project-group" name="project_group" maxlength="120" placeholder="동일 개정군 분할 방지"></label>
+          </div>
+          <label><span>설명</span><textarea id="description" name="description" maxlength="120" rows="3" placeholder="설비·부품·제조 목적을 간결하게 기록"></textarea></label>
+          <div class="form-actions">
+            <p id="upload-message" class="form-message" role="status"></p>
+            <button class="button primary" type="submit">전처리 작업 시작</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="jobs">
+        <div class="section-title-row">
+          <div>
+            <p class="eyebrow">PROCESSING JOBS</p>
+            <h2>작업 현황</h2>
+          </div>
+          <button id="refresh-jobs" class="button ghost" type="button">새로고침</button>
+        </div>
+        <div class="card table-wrap">
+          <table>
+            <thead><tr><th>샘플</th><th>형식</th><th>단계</th><th>품질</th><th>분할</th><th>등록 시각</th><th></th></tr></thead>
+            <tbody id="jobs-body"></tbody>
+          </table>
+          <p id="jobs-empty" class="empty-state">아직 등록된 작업이 없습니다.</p>
+        </div>
+      </section>
+
+      <section id="training" class="training-grid">
+        <div>
+          <p class="eyebrow">BASELINE TRAINING</p>
+          <h2>데이터 품질을 확인하는 기준 모델</h2>
+          <p>완료 샘플의 형상 통계 벡터와 카테고리 라벨을 사용해 최근접 중심 분류기를 학습합니다. 결과는 운영 모델이 아닌 데이터 연결성과 라벨 분리도를 확인하는 기준선입니다.</p>
+          <button id="start-training" class="button secondary" type="button">기준 모델 학습</button>
+          <p id="training-message" class="form-message" role="status"></p>
+        </div>
+        <div class="card training-card">
+          <div class="training-header"><span>최근 학습 실행</span><strong id="training-count">0 runs</strong></div>
+          <div id="training-list" class="training-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="job-dialog">
+    <div class="dialog-head">
+      <div><p class="eyebrow">SAMPLE DETAIL</p><h2 id="detail-title">작업 상세</h2></div>
+      <button id="close-dialog" class="icon-button" type="button" aria-label="닫기">×</button>
+    </div>
+    <div id="detail-content"></div>
+  </dialog>
+</body>
+</html>

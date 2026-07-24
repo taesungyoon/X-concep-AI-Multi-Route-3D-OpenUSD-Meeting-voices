@@ -1,3 +1,10 @@
+"""Typed runtime configuration loaded from environment variables.
+
+Local defaults intentionally select free/local providers: deterministic rules,
+ComfyUI/FLUX, TripoSR, OpenSCAD, Blender, and Faster Whisper when enabled.
+OpenAI Image is an optional mode and its cost guard values remain explicit.
+"""
+
 from __future__ import annotations
 
 import os
@@ -8,13 +15,18 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Settings:
+    # Shared artifact storage and top-level execution profile (mock/live).
     storage_path: Path
     pipeline_mode: str
+
+    # Requirement analysis: rules, mock, or an OpenAI-compatible local vLLM.
     llm_mode: str
     vllm_base_url: str
     vllm_api_key: str
     gemma_model_name: str
     llm_timeout_seconds: int
+
+    # 2D provider. ``comfyui`` is the default; ``openai`` is optional/paid.
     openai_image_mode: str
     openai_api_key: str
     openai_base_url: str
@@ -29,6 +41,8 @@ class Settings:
     openai_image_estimated_cost_usd: float
     openai_image_max_estimated_cost_usd_per_day: float
     openai_image_usage_db: Path
+
+    # Local ComfyUI/FLUX model and sampling controls.
     comfyui_base_url: str
     comfyui_api_key: str
     comfyui_timeout_seconds: int
@@ -40,6 +54,8 @@ class Settings:
     comfyui_steps: int
     comfyui_cfg: float
     comfyui_max_attempts: int
+
+    # Accepted-concept count and deterministic image quality gates.
     image_concept_count: int
     image_min_width: int
     image_min_height: int
@@ -47,7 +63,10 @@ class Settings:
     image_min_channel_stddev: float
     image_require_expected_aspect: bool
     image_semantic_verifier_url: str
+    image_semantic_verifier_api_key: str
     image_semantic_verifier_timeout_seconds: int
+
+    # 3D routes: TripoSR-compatible mesh, OpenSCAD structure, Blender finish.
     hunyuan_mode: str
     shape_provider: str
     hunyuan_api_url: str
@@ -61,6 +80,8 @@ class Settings:
     blender_timeout_seconds: int
     openusd_generate_usdc: bool
     public_storage_prefix: str
+
+    # Meeting audio transcription/diarization. Secrets are supplied via env only.
     speech_mode: str
     whisper_model: str
     whisper_model_cache: Path
@@ -74,15 +95,22 @@ class Settings:
     diarization_mode: str
     pyannote_token: str
     meeting_chunk_seconds: int
+
+    # OpenUSD/Omniverse packaging flags and optional deployment endpoints.
     omniverse_enabled: bool
     omniverse_nucleus_url: str
     omniverse_stream_url: str
     omniverse_generate_layers: bool
     omniverse_enable_physics: bool
     omniverse_enable_variants: bool
+
+    # Router thresholds and independent validation/self-feedback controls.
     routing_low_confidence: float
     routing_high_confidence: float
     validation_dimension_tolerance_pct: float
+    self_feedback_enabled: bool
+    self_feedback_target: float
+    self_feedback_max_attempts: int
     enable_parallel_preview: bool
 
 
@@ -114,6 +142,7 @@ def _native_binary(env_name: str, command: str, portable_pattern: str, installed
 def get_settings() -> Settings:
     root = Path(__file__).resolve().parents[2]
     return Settings(
+        # STORAGE_PATH must be the same mounted volume in API and worker.
         storage_path=Path(os.getenv("STORAGE_PATH", root / "storage")),
         pipeline_mode=os.getenv("PIPELINE_MODE", "mock").strip().lower(),
         llm_mode=os.getenv("LLM_MODE", "mock").strip().lower(),
@@ -121,6 +150,8 @@ def get_settings() -> Settings:
         vllm_api_key=os.getenv("VLLM_API_KEY", "local-not-required"),
         gemma_model_name=os.getenv("GEMMA_MODEL_NAME", "gemma-4-64b-local"),
         llm_timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "180")),
+        # OPENAI_IMAGE_MODE chooses the provider even though legacy variable
+        # names retain the openai_image_* prefix for compatibility.
         openai_image_mode=os.getenv("OPENAI_IMAGE_MODE", "comfyui").strip().lower(),
         openai_api_key=os.getenv("OPENAI_API_KEY", ""),
         openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
@@ -153,7 +184,9 @@ def get_settings() -> Settings:
         image_min_channel_stddev=max(0.0, float(os.getenv("IMAGE_MIN_CHANNEL_STDDEV", "3.0"))),
         image_require_expected_aspect=_bool("IMAGE_REQUIRE_EXPECTED_ASPECT", True),
         image_semantic_verifier_url=os.getenv("IMAGE_SEMANTIC_VERIFIER_URL", "").rstrip("/"),
+        image_semantic_verifier_api_key=os.getenv("IMAGE_SEMANTIC_VERIFIER_API_KEY", "").strip(),
         image_semantic_verifier_timeout_seconds=max(1, int(os.getenv("IMAGE_SEMANTIC_VERIFIER_TIMEOUT_SECONDS", "120"))),
+        # SHAPE_* supersedes HUNYUAN_* while keeping old deployments compatible.
         hunyuan_mode=os.getenv("SHAPE_MODE", os.getenv("HUNYUAN_MODE", "triposr")).strip().lower(),
         shape_provider=os.getenv("SHAPE_PROVIDER", "triposr").strip().lower(),
         hunyuan_api_url=os.getenv("SHAPE_API_URL", os.getenv("HUNYUAN_API_URL", "http://127.0.0.1:8081")).rstrip("/"),
@@ -186,8 +219,13 @@ def get_settings() -> Settings:
         omniverse_generate_layers=_bool("OMNIVERSE_GENERATE_LAYERS", True),
         omniverse_enable_physics=_bool("OMNIVERSE_ENABLE_PHYSICS", True),
         omniverse_enable_variants=_bool("OMNIVERSE_ENABLE_VARIANTS", True),
+        # Confidence bands select automatic primary/secondary generation routes.
         routing_low_confidence=float(os.getenv("ROUTING_LOW_CONFIDENCE", "0.60")),
         routing_high_confidence=float(os.getenv("ROUTING_HIGH_CONFIDENCE", "0.80")),
         validation_dimension_tolerance_pct=float(os.getenv("VALIDATION_DIMENSION_TOLERANCE_PCT", "5.0")),
+        self_feedback_enabled=_bool("SELF_FEEDBACK_ENABLED", True),
+        # 0.95 is an internal multi-signal acceptance target, not certified yield.
+        self_feedback_target=float(os.getenv("SELF_FEEDBACK_TARGET", "0.95")),
+        self_feedback_max_attempts=int(os.getenv("SELF_FEEDBACK_MAX_ATTEMPTS", "3")),
         enable_parallel_preview=_bool("ENABLE_PARALLEL_PREVIEW", True),
     )

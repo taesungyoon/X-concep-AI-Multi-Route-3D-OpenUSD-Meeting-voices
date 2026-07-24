@@ -1,0 +1,60 @@
+{
+  "model": {
+    "base_model": "Qwen/Qwen3-VL-8B-Instruct",
+    "load_in_4bit": true,
+    "finetune_vision_layers": true,
+    "finetune_language_layers": true,
+    "finetune_attention_modules": true,
+    "finetune_mlp_modules": true,
+    "max_pixels": null
+  },
+  "data": {
+    "dataset_dir": "data/examples",
+    "target_type": "design_spec",
+    "train_split": "train",
+    "eval_split": "eval",
+    "max_images": 3,
+    "limit_train": null,
+    "limit_eval": null
+  },
+  "training": {
+    "output_dir": "outputs/qwen3-vl-8b-designspec",
+    "num_train_epochs": 2.0,
+    "max_steps": null,
+    "per_device_train_batch_size": 1,
+    "per_device_eval_batch_size": 1,
+    "gradient_accumulation_steps": 32,
+    "learning_rate": 0.00005,
+    "warmup_ratio": 0.03,
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "lr_scheduler_type": "cosine",
+    "optim": "adamw_8bit",
+    "bf16": true,
+    "fp16": false,
+    "logging_steps": 10,
+    "save_steps": 100,
+    "eval_steps": 100,
+    "save_total_limit": 3,
+    "resume_from_checkpoint": "auto",
+    "seed": 3407,
+    "world_size": 1
+  },
+  "lora": {
+    "r": 32,
+    "alpha": 64,
+    "dropout": 0.0,
+    "use_rslora": false
+  },
+  "tracking": {
+    "report_to": ["tensorboard", "trackio"],
+    "project": "xconcep-cad-vlm",
+    "run_name": "qwen3-vl-8b-designspec"
+  },
+  "hub": {
+    "enabled": false,
+    "repo_id": "",
+    "private": true,
+    "push_checkpoints": false
+  }
+}

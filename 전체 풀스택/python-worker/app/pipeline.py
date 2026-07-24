@@ -1,3 +1,15 @@
+"""Orchestrate the complete Xconcep generation workflow.
+
+Workflow:
+1. Analyze a prompt or meeting transcript into a canonical DesignState.
+2. Generate and quality-filter four 2D concepts (ComfyUI by default).
+3. Route the selected concept to TripoSR, OpenSCAD, Blender, or a hybrid.
+4. Validate geometry/appearance, package OpenUSD layers, and expose artifacts.
+
+All project artifacts are written below ``Settings.storage_path`` so the API,
+Celery worker, PHP frontend, and downloadable result URLs share one source.
+"""
+
 from __future__ import annotations
 
 import json
@@ -11,17 +23,21 @@ import trimesh
 
 from . import generator as generator_module
 from .blender_engine import generate_blender_asset
+from .contract_validation import validate_contract_multiview
 from .design_state import build_design_state
 from .generation_router import plan_generation
 from .generator import generate_3d as generate_3d_mock
 from .hunyuan_client import Hunyuan3DClient
+from .image_precision import requirements_from_design_spec
 from .llm_client import LocalGemmaClient
 from .meeting_analyzer import MeetingAnalyzer
+from .manufacturing_feedback import compare_appearance, evaluate_candidate
 from .models import Generate2DRequest, Generate3DRequest, MeetingAnalyzeRequest, MeetingPatchRequest, MeetingTranscribeRequest
 from .openai_image_client import GPTImageClient
 from .openscad_engine import generate_openscad
 from .openusd_exporter import export_openusd, validate_usda
 from .parametric_generators import (
+    MODE_FOR_CATEGORY,
     SPECIALIZED_MODES,
     apply_partial_regeneration,
     build_geometry_contract,
@@ -43,8 +59,22 @@ class GenerationPipeline:
         self.meeting = MeetingAnalyzer(settings)
 
     def generate_2d(self, request: Generate2DRequest) -> dict[str, Any]:
+        """Run requirement analysis, 2D generation, and 3D-alignment preflight."""
         image_paths = [self._resolve_path(value) for value in request.image_paths]
-        analysis = self.llm.analyze(request.prompt, request.category, [str(path) for path in image_paths])
+        analysis = dict(self.llm.analyze(request.prompt, request.category, [str(path) for path in image_paths]))
+        # DesignState is the contract shared by image prompting and downstream CAD.
+        alignment_state = build_design_state(
+            project_id=request.project_id,
+            revision=1,
+            prompt=request.prompt,
+            category=request.category,
+            selected_2d_id="ALIGNMENT-PREFLIGHT",
+            source_analysis=analysis,
+        )
+        image_task, image_requirements = requirements_from_design_spec(alignment_state["design_spec"])
+        analysis["image_task"] = image_task
+        analysis["image_requirements"] = image_requirements
+        analysis["design_spec"] = alignment_state["design_spec"]
         results = self.images.generate_concepts(
             project_id=request.project_id,
             prompt=request.prompt,
@@ -53,14 +83,63 @@ class GenerationPipeline:
             analysis=analysis,
         )
         project_dir = self._project_dir(request.project_id)
+        # Rank accepted images against deterministic front/top/right projections.
+        # Failure here does not discard otherwise valid 2D concepts.
+        alignment_report: dict[str, Any] = {"available": False, "recommended_concept_id": None, "scores": []}
+        try:
+            alignment_contract = build_geometry_contract(
+                alignment_state,
+                request.category,
+                MODE_FOR_CATEGORY[request.category],
+            )
+            alignment_root = project_dir / "concept_alignment"
+            projection = validate_contract_multiview(alignment_contract, alignment_root / "views")
+            candidate_paths = [alignment_root / "views" / f"{name}.png" for name in ("front", "top", "right")]
+            rows: list[dict[str, Any]] = []
+            for item in results:
+                comparison = compare_appearance(Path(item["absolute_path"]), candidate_paths)
+                row = {
+                    "concept_id": item["id"],
+                    "score": round(float(comparison["score"]), 4),
+                    "best_projection": Path(str((comparison.get("best_candidate") or {}).get("path") or "")).stem or None,
+                }
+                item["geometry_alignment"] = row
+                rows.append(row)
+            best = max(rows, key=lambda value: float(value["score"]), default=None)
+            for item in results:
+                item["recommended_for_3d"] = bool(best and item["id"] == best["concept_id"])
+            alignment_report = {
+                "available": bool(best),
+                "method": "deterministic parametric front/top/right silhouette preflight",
+                "recommended_concept_id": best["concept_id"] if best else None,
+                "scores": sorted(rows, key=lambda value: float(value["score"]), reverse=True),
+                "contract_projection": projection,
+            }
+            (alignment_root / "concept_alignment.json").write_text(
+                json.dumps(alignment_report, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception as exc:
+            alignment_report = {
+                "available": False,
+                "recommended_concept_id": None,
+                "scores": [],
+                "error": str(exc),
+            }
         (project_dir / "analysis.json").write_text(
             json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         return {
             "results": results,
             "analysis": analysis,
+            "concept_alignment": alignment_report,
             "pipeline": {
-                "llm": f"OpenAI-compatible ({self.settings.llm_mode})" if self.settings.llm_mode != "mock" else "mock",
+                "llm": (
+                    "deterministic local rules"
+                    if self.settings.llm_mode == "rules"
+                    else f"OpenAI-compatible ({self.settings.llm_mode})"
+                    if self.settings.llm_mode != "mock"
+                    else "mock"
+                ),
                 "image": (
                     f"OpenAI {self.settings.openai_image_model}"
                     if self.settings.openai_image_mode == "openai"
@@ -77,6 +156,7 @@ class GenerationPipeline:
         }
 
     def generate_3d(self, request: Generate3DRequest) -> dict[str, Any]:
+        """Route one selected concept through generation, validation, and packaging."""
         selected_path = self._resolve_path(request.selected_image_path)
         source_analysis = request.source_analysis or self._load_json(self._project_dir(request.project_id) / "analysis.json")
         design_state = build_design_state(
@@ -104,6 +184,8 @@ class GenerationPipeline:
         (project_dir / "design_state.json").write_text(json.dumps(design_state, ensure_ascii=False, indent=2), encoding="utf-8")
         (project_dir / "generation_plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 
+        # Generation routes may coexist: image mesh for appearance, parametric
+        # OpenSCAD for manufacturable structure, then Blender for consolidation.
         route = str(plan["primary_route"])
         source_assets: list[dict[str, Any]] = []
         source_glbs: list[Path] = []
@@ -166,7 +248,57 @@ class GenerationPipeline:
         openusd_required = "openusd" in plan.get("postprocess", []) or request.output_goal == "motion_openusd"
         structural_asset = next((item for item in source_assets if item.get("route_key") == "structural"), None)
         active_glb = Path(active_asset["absolute_paths"]["glb"])
+        manufacturing_glb = Path((structural_asset or active_asset)["absolute_paths"]["glb"])
         manifest_path = Path(active_asset["absolute_paths"]["manifest"]) if active_asset["absolute_paths"].get("manifest") else None
+        self_feedback: dict[str, Any] | None = None
+        self_feedback_report_path = result_root / "self_feedback_report.json"
+        # The 0.95 target is an internal evidence score, not a blanket promise of
+        # 95% manufacturing accuracy; failed scopes are returned for regeneration.
+        if self.settings.self_feedback_enabled and selected_path.exists():
+            evaluation_contract: dict[str, Any] = {}
+            if structural_asset:
+                geometry_path = structural_asset.get("absolute_paths", {}).get("geometry_json")
+                if geometry_path:
+                    evaluation_contract = self._load_json(Path(str(geometry_path))) or {}
+            candidate_paths: list[Path] = []
+            for value in [
+                active_asset.get("absolute_paths", {}).get("preview"),
+                (structural_asset or {}).get("absolute_paths", {}).get("view_front"),
+                (structural_asset or {}).get("absolute_paths", {}).get("view_top"),
+                (structural_asset or {}).get("absolute_paths", {}).get("view_right"),
+            ]:
+                if value:
+                    candidate_paths.append(Path(str(value)))
+            try:
+                self_feedback = evaluate_candidate(
+                    reference_path=selected_path,
+                    candidate_paths=candidate_paths,
+                    glb_path=manufacturing_glb,
+                    contract=evaluation_contract,
+                    target=self.settings.self_feedback_target,
+                    dimension_tolerance_pct=self.settings.validation_dimension_tolerance_pct,
+                )
+                self_feedback["manufacturing_asset"] = {
+                    "role": "structural" if structural_asset else active_asset["route_key"],
+                    "path": str(manufacturing_glb),
+                }
+                self_feedback["regeneration_plan"]["max_attempts"] = self.settings.self_feedback_max_attempts
+            except Exception as exc:
+                self_feedback = {
+                    "schema": "xconcep.manufacturing-feedback/1.0",
+                    "independent_evaluation": True,
+                    "passed": False,
+                    "score": 0.0,
+                    "evaluation_error": str(exc),
+                    "regeneration_plan": {
+                        "recommended": False,
+                        "scopes": [],
+                        "strategy": "evaluation_repair_required",
+                    },
+                }
+            self_feedback_report_path.write_text(
+                json.dumps(self_feedback, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
         validation = validate_asset(
             glb_path=active_glb,
             route=route,
@@ -174,6 +306,7 @@ class GenerationPipeline:
             manifest_path=manifest_path,
             dimension_tolerance_pct=self.settings.validation_dimension_tolerance_pct,
             blender_processed=active_asset["route_key"] == "high_quality",
+            independent_validation=self_feedback,
         )
         if structural_asset and validation.get("multiview"):
             view_urls = structural_asset.get("validation_views") or {}
@@ -223,6 +356,11 @@ class GenerationPipeline:
             "validation_views": (structural_asset or {}).get("validation_views") or {},
             "multiview_report_url": (structural_asset or {}).get("multiview_report_url"),
             "validation": validation,
+            "self_feedback": self_feedback,
+            "self_feedback_report_url": (
+                self._public_url(request.project_id, "result/self_feedback_report.json")
+                if self_feedback else None
+            ),
             "validation_grade": validation["grade"],
             "validation_grade_label": validation["grade_label"],
             "regeneration_actions": plan.get("user_actions", []),
@@ -238,6 +376,8 @@ class GenerationPipeline:
             },
             "absolute_paths": active_asset.get("absolute_paths", {}),
         }
+        if self_feedback:
+            result["absolute_paths"]["self_feedback_report"] = str(self_feedback_report_path)
         if openusd:
             result["absolute_paths"].update(openusd.get("absolute_paths") or {})
             result.update({
@@ -374,6 +514,12 @@ class GenerationPipeline:
         if generated.get("blend_path"):
             result["blend_url"] = self._public_url(request.project_id, "result/high_quality/model_high_quality.blend")
             result["absolute_paths"]["blend"] = str(generated["blend_path"])
+        if generated.get("camera_search_path"):
+            result["camera_search_url"] = self._public_url(
+                request.project_id,
+                "result/high_quality/camera_search_report.json",
+            )
+            result["absolute_paths"]["camera_search"] = str(generated["camera_search_path"])
         return result
 
     def _package_openusd(
@@ -434,12 +580,14 @@ class GenerationPipeline:
         return result
 
     def transcribe_meeting(self, request: MeetingTranscribeRequest) -> dict[str, Any]:
+        """Transcribe one uploaded/recorded audio chunk with the configured ASR."""
         audio_path = self._resolve_path(request.audio_path)
         result = self.speech.transcribe(audio_path, request.language, request.chunk_index)
         result["chunk_index"] = request.chunk_index
         return result
 
     def analyze_meeting(self, request: MeetingAnalyzeRequest) -> dict[str, Any]:
+        """Convert the accumulated transcript into requirements and a prompt."""
         analysis = self.meeting.analyze(request.transcript, request.category, request.previous_analysis, request.retrieval_context)
         project_dir = self._project_dir(request.project_id)
         meeting_dir = project_dir / "meeting"
@@ -448,6 +596,7 @@ class GenerationPipeline:
         return {"analysis": analysis, "generation_prompt": analysis.get("generation_prompt", request.transcript)}
 
     def patch_meeting(self, request: MeetingPatchRequest) -> dict[str, Any]:
+        """Create a revision patch when later meeting speech changes requirements."""
         patch = self.meeting.create_patch(request.transcript, request.current_analysis, request.base_revision)
         project_dir = self._project_dir(request.project_id)
         meeting_dir = project_dir / "meeting"
@@ -458,7 +607,13 @@ class GenerationPipeline:
         return patch
 
     def health(self) -> dict[str, Any]:
-        llm_connected = self._probe_http(self.settings.vllm_base_url, "/models") if self.settings.llm_mode != "mock" else False
+        llm_connected = (
+            True
+            if self.settings.llm_mode == "rules"
+            else self._probe_http(self.settings.vllm_base_url, "/models")
+            if self.settings.llm_mode != "mock"
+            else False
+        )
         hunyuan_connected = self._probe_http(self.settings.hunyuan_api_url, "/health") if self.settings.hunyuan_mode != "mock" else False
         if self.settings.speech_mode == "nvidia_nim":
             speech_connected = self._probe_http(self.settings.nvidia_asr_url, "/health/ready")
@@ -495,7 +650,19 @@ class GenerationPipeline:
             "pipeline_mode": self.settings.pipeline_mode,
             "execution_profile": execution_profile,
             "runtime_ready": runtime_ready,
-            "llm": {"mode": self.settings.llm_mode, "backend": "OpenAI-compatible" if self.settings.llm_mode != "mock" else "mock", "endpoint": self.settings.vllm_base_url, "model": self.settings.gemma_model_name, "connected": llm_connected},
+            "llm": {
+                "mode": self.settings.llm_mode,
+                "backend": (
+                    "deterministic-local-rules"
+                    if self.settings.llm_mode == "rules"
+                    else "OpenAI-compatible"
+                    if self.settings.llm_mode != "mock"
+                    else "mock"
+                ),
+                "endpoint": None if self.settings.llm_mode == "rules" else self.settings.vllm_base_url,
+                "model": "xconcep-requirement-rules-v1" if self.settings.llm_mode == "rules" else self.settings.gemma_model_name,
+                "connected": llm_connected,
+            },
             "image": {
                 "mode": self.settings.openai_image_mode,
                 "model": self.settings.comfyui_unet_model if self.settings.openai_image_mode == "comfyui" else self.settings.openai_image_model,

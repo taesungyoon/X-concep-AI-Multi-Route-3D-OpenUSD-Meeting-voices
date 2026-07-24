@@ -1,0 +1,1 @@
+{"schema_version": "1.0", "sample_id": "CAD-EQUIPMENT_SAFETY_CELL_002", "source": {"format": "xconcep_parametric", "sha256": "60dae92cd02342c35b9c8f1270a4dc5883951270d72ab593a06196565abd1f7e"}, "label": {"category": "equipment"}, "split": "train", "provenance": {"pipeline": "xconcep-php-compatible", "version": "1.2.0"}}

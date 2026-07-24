@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "policy": "Only data with explicit training rights may enter production training.",
+  "allowed_training_licenses": [
+    "LicenseRef-Xconcep-Internal-Generated",
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0"
+  ],
+  "blocked_examples": [
+    "CC-BY-NC-4.0",
+    "Fusion360-Gallery-NonCommercial",
+    "Unknown",
+    "No-License"
+  ]
+}

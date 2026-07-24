@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xconcep.local/schemas/manifest.schema.json",
+  "title": "CAD AI Dataset Manifest",
+  "type": "object",
+  "required": ["schema_version", "sample_id", "source", "label", "split", "quality", "artifacts", "provenance"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "sample_id": {"type": "string"},
+    "source": {"type": "object"},
+    "label": {"type": "object"},
+    "split": {"enum": ["train", "validation", "test"]},
+    "quality": {"type": "object"},
+    "artifacts": {"type": "array", "items": {"type": "string"}},
+    "provenance": {"type": "object"}
+  }
+}

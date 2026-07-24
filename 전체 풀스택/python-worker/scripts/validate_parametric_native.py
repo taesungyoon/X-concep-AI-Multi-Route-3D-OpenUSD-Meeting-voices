@@ -87,6 +87,8 @@ def _write_summary(output_dir: Path, report: dict[str, Any]) -> None:
         "# Native parametric CAD validation",
         "",
         f"- Overall: {'PASS' if report['passed'] else 'FAIL'}",
+        f"- Contract acceptance: {report['acceptance_rate_pct']:.2f}% ({report['correct_count']}/{report['case_count']})",
+        f"- Independent evaluation: {'YES' if report['independent_evaluation'] else 'NO'}",
         f"- OpenSCAD: {report['runtime']['openscad']}",
         f"- Blender: {report['runtime']['blender']}",
         "",
@@ -244,7 +246,22 @@ def main() -> int:
         }
     except Exception as exc:
         report["blender"] = {"passed": False, "error": str(exc), "preview": None}
-    report["passed"] = all(item["passed"] for item in report["cases"]) and report["blender"]["passed"]
+    report["case_count"] = len(report["cases"])
+    report["correct_count"] = sum(1 for item in report["cases"] if item["passed"])
+    report["acceptance_rate_pct"] = round(
+        report["correct_count"] / max(report["case_count"], 1) * 100.0,
+        2,
+    )
+    report["independent_evaluation"] = False
+    report["evaluator"] = "xconcep-native-contract-validation"
+    report["evaluation_scope"] = (
+        "deterministic OpenSCAD/Blender execution, mesh, dimensions, requirement coverage, "
+        "contract projections, and OpenUSD hierarchy"
+    )
+    report["passed"] = (
+        report["correct_count"] == report["case_count"]
+        and report["blender"]["passed"]
+    )
     _write_summary(output_dir, report)
     print(json.dumps({"passed": report["passed"], "report": str(output_dir / "native_validation_report.json")}, ensure_ascii=False))
     return 0 if report["passed"] else 1

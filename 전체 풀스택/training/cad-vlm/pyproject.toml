@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xconcep-cad-vlm"
+version = "0.1.0"
+description = "Portable Qwen3-VL QLoRA training package for Xconcep DesignSpec extraction"
+requires-python = ">=3.10,<3.13"
+dependencies = ["Pillow>=11.0,<13"]
+
+[project.optional-dependencies]
+train = [
+  "accelerate>=1.2,<2",
+  "bitsandbytes>=0.45,<1",
+  "datasets>=3.2,<5",
+  "huggingface-hub[hf-transfer]>=0.27,<2",
+  "peft>=0.14,<1",
+  "safetensors>=0.5,<1",
+  "tensorboard>=2.18,<3",
+  "trackio>=0.3,<1",
+  "transformers==4.57.3",
+  "trl==0.22.2",
+  "unsloth==2026.7.5",
+  "xformers==0.0.31.post1",
+]
+test = ["pytest>=8.3,<9"]
+serve = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

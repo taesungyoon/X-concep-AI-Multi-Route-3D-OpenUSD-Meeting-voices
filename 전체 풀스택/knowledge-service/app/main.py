@@ -1,3 +1,10 @@
+"""Project-scoped retrieval memory backed by Qdrant.
+
+Local mode uses deterministic 384-D hash embeddings and a fallback document
+extractor. Production can switch to NVIDIA embedding/Retriever endpoints by
+environment variables without changing ingest/search request contracts.
+"""
+
 from __future__ import annotations
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
@@ -10,6 +17,8 @@ import os, hashlib, math, uuid, httpx, tempfile, json
 from .retriever_adapter import extract_with_nemo_retriever, extract_fallback
 
 app=FastAPI(title='X concep Knowledge Service',version='1.1.0')
+# Provider controls: QDRANT_URL selects persistence; EMBED_MODE=nim and
+# NEMO_RETRIEVER_MODE=nemo enable external NVIDIA services.
 QDRANT=os.getenv('QDRANT_URL','http://qdrant:6333')
 COLLECTION=os.getenv('QDRANT_COLLECTION','xconcep_memory')
 EMBED_MODE=os.getenv('EMBED_MODE','hash')
@@ -28,12 +37,14 @@ class AssetIndex(BaseModel):
 def ensure_collection():
     if not client.collection_exists(COLLECTION): client.create_collection(COLLECTION,vectors_config=VectorParams(size=DIM,distance=Distance.COSINE))
 def hash_embed(text):
+    """Provide an offline, repeatable embedding for development and tests."""
     values=[0.0]*DIM
     for token in text.lower().split():
         h=hashlib.sha256(token.encode()).digest(); idx=int.from_bytes(h[:4],'big')%DIM; values[idx]+=1.0 if h[4]%2 else -1.0
     norm=math.sqrt(sum(v*v for v in values)) or 1.0
     return [v/norm for v in values]
 def embed(text):
+    """Use NIM embeddings when configured, otherwise stay fully local."""
     if EMBED_MODE=='nim' and EMBED_URL:
         with httpx.Client(timeout=120) as c:
             r=c.post(EMBED_URL+'/v1/embeddings',json={'input':[text],'model':os.getenv('EMBED_MODEL','nvidia/nv-embedqa-e5-v5')}); r.raise_for_status(); return r.json()['data'][0]['embedding']

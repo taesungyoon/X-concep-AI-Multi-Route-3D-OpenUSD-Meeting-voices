@@ -1,0 +1,64 @@
+Metadata-Version: 2.4
+Name: piper-onnx
+Version: 1.0.6
+Summary: Use piper TTS with onnxruntime
+Project-URL: Homepage, https://github.com/thewh1teagle/piper-onnx
+Project-URL: Repository, https://github.com/thewh1teagle/piper-onnx
+Project-URL: Issues, https://github.com/thewh1teagle/piper-onnx/issues
+Author-email: thewh1teagle <61390950+thewh1teagle@users.noreply.github.com>
+License: MIT License
+        
+        Copyright (c) [year] [fullname]
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+License-File: LICENSE
+Requires-Python: >=3.10
+Requires-Dist: espeakng-loader>=0.2.4
+Requires-Dist: onnxruntime>=1.20.0
+Requires-Dist: phonemizer-fork>=3.3.2
+Description-Content-Type: text/markdown
+
+# piper-onnx
+
+<img src="https://count.getloli.com/@count?name=count&theme=minecraft&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=0">
+
+Use piper TTS with onnxruntime
+
+## Features
+
+- Fast
+- Lightweight
+- User friendly
+- Support (Windows/Linux/macOS/Raspbian)
+
+## Setup
+
+```console
+pip install -U piper-onnx
+```
+
+## Examples
+
+See [examples](examples) for usage.
+
+## Voices
+
+See [piper voices](https://huggingface.co/rhasspy/piper-voices) for choosing model
+
+You can hear them in [piper-samples](https://rhasspy.github.io/piper-samples)

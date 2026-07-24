@@ -1,0 +1,34 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      CAD_AI_HOST: 0.0.0.0
+      CAD_AI_PORT: 8080
+      CAD_AI_INSTANCE: /app/instance
+      CAD_AI_DSN: mysql:host=db;dbname=cad_ai;charset=utf8mb4
+      CAD_AI_DB_USER: cad_ai
+      CAD_AI_DB_PASSWORD: change-me
+    volumes:
+      - cad_data:/app/instance
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: cad_ai
+      MARIADB_USER: cad_ai
+      MARIADB_PASSWORD: change-me
+      MARIADB_ROOT_PASSWORD: change-root-me
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - db_data:/var/lib/mysql
+volumes:
+  cad_data:
+  db_data:

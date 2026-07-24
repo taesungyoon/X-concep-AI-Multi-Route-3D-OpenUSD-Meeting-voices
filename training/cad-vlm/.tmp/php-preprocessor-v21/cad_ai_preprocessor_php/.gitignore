@@ -1,0 +1,6 @@
+/instance/
+/validation_reports/
+/vendor/
+/.phpunit.cache/
+/.env
+*.log
