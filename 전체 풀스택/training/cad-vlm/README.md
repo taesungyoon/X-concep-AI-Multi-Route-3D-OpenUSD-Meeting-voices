@@ -1,5 +1,8 @@
 # Xconcep CAD VLM 학습 패키지
 
+서버에 ZIP을 복사해 바로 설치·데이터 반입·학습하려면
+[`SERVER_INSTALL_QUICKSTART_KO.md`](SERVER_INSTALL_QUICKSTART_KO.md)부터 따른다.
+
 외부 서버 복사, Docker/가상환경 설치, 학습 결과 어댑터만 이동하는 세 가지 절차는
 [`docs/MIGRATION_GUIDE_KO.md`](docs/MIGRATION_GUIDE_KO.md)에 정리되어 있다.
 

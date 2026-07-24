@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 $pythonBin = if ($env:PYTHON_BIN) { $env:PYTHON_BIN } else { "python" }
-$torchIndex = if ($env:PYTORCH_INDEX_URL) { $env:PYTORCH_INDEX_URL } else { "https://download.pytorch.org/whl/cu124" }
+$torchIndex = if ($env:PYTORCH_INDEX_URL) { $env:PYTORCH_INDEX_URL } else { "https://download.pytorch.org/whl/cu128" }
 & $pythonBin -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install --upgrade pip wheel
 & .\.venv\Scripts\python.exe -m pip install torch torchvision --index-url $torchIndex

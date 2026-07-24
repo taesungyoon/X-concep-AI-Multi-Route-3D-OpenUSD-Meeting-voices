@@ -3,7 +3,11 @@ outputs
 dist
 hf-cache
 model-cache
+.tmp
+data/*.php-build
+data/examples-php-v2
+data/php-api-e2e-smoke-v1
+configs/*smoke*.json
 **/__pycache__
 **/.pytest_cache
 .env
-

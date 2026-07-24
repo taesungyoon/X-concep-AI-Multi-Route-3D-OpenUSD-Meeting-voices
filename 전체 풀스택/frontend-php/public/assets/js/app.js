@@ -556,7 +556,9 @@ async function activateResultAsset(key, result = state.project.result_3d || {}) 
   setDownload('#downloadRender', asset.preview_url || result.preview_url);
   setDownload('#downloadScad', asset.scad_url);
   setDownload('#downloadGeometryJson', asset.geometry_json_url);
+  setDownload('#downloadBlend', asset.blend_url);
   setDownload('#downloadBlenderScript', asset.blender_script_url);
+  setDownload('#downloadMaterialManifest', asset.material_manifest_url);
   const viewer = qs('#viewer3d');
   initViewer(viewer);
   const glbUrl = safeAssetUrl(asset.glb_url || result.glb_url);

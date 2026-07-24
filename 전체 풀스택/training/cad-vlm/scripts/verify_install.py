@@ -5,6 +5,24 @@ import hashlib
 import json
 from pathlib import Path
 
+REQUIRED_FILES = {
+    ".env.example",
+    "compose.yaml",
+    "Dockerfile",
+    "pyproject.toml",
+    "README.md",
+    "SERVER_INSTALL_QUICKSTART_KO.md",
+    "configs/qwen3-vl-4b-qlora.json",
+    "scripts/import_php_cad_dataset.py",
+    "scripts/preprocess_dataset.py",
+    "scripts/train_vlm.py",
+    "scripts/train.sh",
+    "scripts/train.ps1",
+    "scripts/validate_dataset.py",
+    "src/xconcep_cad_vlm/php_cad.py",
+    "data/examples/records.jsonl",
+}
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify an extracted Xconcep CAD VLM portable bundle")
@@ -17,7 +35,13 @@ def main() -> int:
         return 2
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     failures = []
-    for row in manifest.get("files") or []:
+    rows = manifest.get("files") or []
+    listed = {str(row.get("path") or "") for row in rows}
+    if manifest.get("schema") != "xconcep.cad-vlm-portable-manifest/1.1":
+        failures.append({"path": "bundle-manifest.json", "error": "unsupported schema"})
+    for required in sorted(REQUIRED_FILES - listed):
+        failures.append({"path": required, "error": "required file is not listed"})
+    for row in rows:
         relative = Path(str(row["path"]))
         path = (root / relative).resolve()
         try:
@@ -34,7 +58,7 @@ def main() -> int:
     report = {
         "schema": manifest.get("schema"),
         "valid": not failures,
-        "checked_files": len(manifest.get("files") or []),
+        "checked_files": len(rows),
         "failures": failures,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))

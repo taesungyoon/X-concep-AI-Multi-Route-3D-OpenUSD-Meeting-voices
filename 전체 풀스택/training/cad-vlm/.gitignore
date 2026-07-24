@@ -5,5 +5,9 @@ hf-cache/
 model-cache/
 dist/
 environment.freeze.txt
+.tmp/
+data/*.php-build/
+data/examples-php-v2/
+data/php-api-e2e-smoke-v1/
 **/__pycache__/
 **/.pytest_cache/
