@@ -24,3 +24,20 @@ optix7cache.db*
 분리 패키지/*/storage/quality-datasets/
 분리 패키지/*/storage/quality-program/
 분리 패키지/*/storage/quality-results/
+전체 풀스택/omniverse-rtx/.venv-linux/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+omniverse-rtx/.venv-linux/
+
+# Environment files
+.env
+.env.*
+!.env.example

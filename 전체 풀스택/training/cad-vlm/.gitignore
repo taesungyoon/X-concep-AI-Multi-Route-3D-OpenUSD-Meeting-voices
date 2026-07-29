@@ -1,5 +1,6 @@
 .env
 .venv/
+.venv-linux/
 outputs/
 hf-cache/
 model-cache/
@@ -11,3 +12,20 @@ data/examples-php-v2/
 data/php-api-e2e-smoke-v1/
 **/__pycache__/
 **/.pytest_cache/
+omniverse-rtx/.venv-linux/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+omniverse-rtx/.venv-linux/
+
+# Environment files
+.env
+.env.*
+!.env.example

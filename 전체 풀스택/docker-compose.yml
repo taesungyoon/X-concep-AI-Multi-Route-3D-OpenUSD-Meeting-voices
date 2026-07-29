@@ -125,6 +125,7 @@ services:
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-local-not-required}
       GEMMA_MODEL_NAME: ${GEMMA_MODEL_NAME:-gemma-4-64b-local}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-600}
     depends_on:
       python-worker: {condition: service_healthy}
     extra_hosts: ["host.docker.internal:host-gateway"]
@@ -147,6 +148,7 @@ services:
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
       VLLM_API_KEY: ${VLLM_API_KEY:-local-not-required}
       GEMMA_MODEL_NAME: ${GEMMA_MODEL_NAME:-gemma-4-64b-local}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-600}
       # Default 2D mode is local ComfyUI/FLUX. Set "openai" explicitly for the
       # optional paid mode; request/cost limits below remain enforced.
       OPENAI_IMAGE_MODE: ${OPENAI_IMAGE_MODE:-comfyui}

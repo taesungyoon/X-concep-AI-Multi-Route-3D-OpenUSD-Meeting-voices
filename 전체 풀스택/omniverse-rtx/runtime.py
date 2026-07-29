@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import signal
-import subprocess
 import sys
 import threading
 import time
@@ -57,6 +56,7 @@ class RuntimeConfig:
     height: int = 720
     fps: int = 30
     cuda_device: int = 0
+    video_input: str = "cuda"
     signaling_port: int = 49100
     public_ip: str = "127.0.0.1"
     health_host: str = "127.0.0.1"
@@ -70,6 +70,7 @@ class RuntimeConfig:
             height=int(os.getenv("OVRTX_HEIGHT", "720")),
             fps=int(os.getenv("OVRTX_FPS", "30")),
             cuda_device=int(os.getenv("OVRTX_CUDA_DEVICE", "0")),
+            video_input=os.getenv("OVSTREAM_VIDEO_INPUT", "cuda").lower(),
             signaling_port=int(os.getenv("OVSTREAM_SIGNALING_PORT", "49100")),
             public_ip=os.getenv("OVSTREAM_PUBLIC_IP", "127.0.0.1"),
             health_host=os.getenv("OVRTX_HEALTH_HOST", "127.0.0.1"),
@@ -93,8 +94,9 @@ class RuntimeState:
 
 
 class OmniverseRuntime:
-    def __init__(self, config: RuntimeConfig) -> None:
+    def __init__(self, config: RuntimeConfig, asset_path: str | None = None) -> None:
         self.config = config
+        self.asset_path = asset_path
         self.state = RuntimeState()
         self._state_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -171,20 +173,11 @@ class OmniverseRuntime:
             self.state.ovrtx_version = ".".join(map(str, self._renderer.version))
 
     def _open_validation_stage(self) -> None:
-        stage = validation_stage_usda(self.config.width, self.config.height)
+        stage = validation_stage_usda(
+            self.config.width, self.config.height, self.asset_path
+        )
         stage_copy = RUNTIME_ROOT / "validation-stage.usda"
         stage_copy.write_text(stage, encoding="utf-8")
-        validator = Path(__file__).with_name("pxr_validate.py")
-        validation = subprocess.run(
-            [sys.executable, str(validator), str(stage_copy)],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if validation.returncode != 0:
-            detail = validation.stderr.strip() or validation.stdout.strip()
-            raise RuntimeError(f"OpenUSD validation failed: {detail}")
         self._stage = ovstage.Stage("xconcep.omniverse.runtime")
         self._renderer.attach_ovstage(self._stage)
         ovstage.population.open_usd_from_string(
@@ -279,7 +272,11 @@ class OmniverseRuntime:
                 width=self.config.width,
                 height=self.config.height,
                 target_fps=self.config.fps,
-                video_input=ovstream.VideoInput.CUDA,
+                video_input=(
+                    ovstream.VideoInput.TENSOR
+                    if self.config.video_input == "tensor"
+                    else ovstream.VideoInput.CUDA
+                ),
                 cuda_device=self.config.cuda_device,
                 cuda_context=cuda_context,
                 webrtc_signal_port=self.config.signaling_port,
@@ -326,7 +323,11 @@ class OmniverseRuntime:
                 self.config.health_host,
                 self.config.health_port,
             )
-            frame = ovstream.VideoFrame.from_cuda_array(self._stream_buffer)
+            frame = (
+                ovstream.VideoFrame.from_dlpack(self._stream_buffer)
+                if self.config.video_input == "tensor"
+                else ovstream.VideoFrame.from_cuda_array(self._stream_buffer)
+            )
             frame_interval = 1.0 / self.config.fps
             loop_frames = 0
             while not self._stop_event.is_set():
@@ -381,9 +382,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="X concep AI ovrtx/ovstream runtime")
     parser.add_argument("--validate-only", action="store_true", help="render one verified frame and exit")
     parser.add_argument("--max-frames", type=int, default=None)
+    parser.add_argument("--usd", help="USD asset to render instead of the built-in validation part")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    runtime = OmniverseRuntime(RuntimeConfig.from_env())
+    runtime = OmniverseRuntime(RuntimeConfig.from_env(), args.usd)
     if args.validate_only:
         print(json.dumps(runtime.validate(), ensure_ascii=False, indent=2))
         return 0

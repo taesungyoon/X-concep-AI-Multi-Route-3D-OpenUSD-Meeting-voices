@@ -50,3 +50,19 @@ def test_full_generation_flow():
     assert Path(output["absolute_paths"]["glb"]).is_file()
     assert Path(output["absolute_paths"]["stl"]).is_file()
     assert Path(output["absolute_paths"]["preview"]).is_file()
+
+def test_http_probe_rejects_404_and_sends_bearer(monkeypatch):
+    seen = {}
+    class Response:
+        is_success = False
+    class Client:
+        def __init__(self, **_kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *_args): pass
+        def get(self, url, headers):
+            seen.update(url=url, headers=headers)
+            return Response()
+    monkeypatch.setattr("app.pipeline.httpx.Client", Client)
+    from app.pipeline import GenerationPipeline
+    assert GenerationPipeline._probe_http("https://shape.test", "/health", "secret") is False
+    assert seen == {"url": "https://shape.test/health", "headers": {"Authorization": "Bearer secret"}}

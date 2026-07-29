@@ -10,8 +10,7 @@ const status = document.getElementById('status') as HTMLSpanElement;
 const params = new URLSearchParams(location.search);
 const server = params.get('server') || location.hostname;
 const signalingPort = Number(params.get('signalingPort') || '49100');
-const mediaPort = Number(params.get('mediaPort') || '47998');
-const accessToken = params.get('accessToken') || '';
+const video = document.getElementById('stream-video') as HTMLVideoElement;
 
 function updateStatus(message: string): void {
   status.textContent = message;
@@ -21,21 +20,17 @@ async function connect(): Promise<void> {
   updateStatus(`${server}:${signalingPort} 연결 중`);
   const props: StreamProps = {
     streamSource: StreamType.DIRECT,
-    logLevel: LogLevel.WARN,
+    logLevel: LogLevel.INFO,
     streamConfig: {
       server,
       signalingPort,
-      mediaPort,
       videoElementId: 'stream-video',
       audioElementId: 'stream-audio',
-      width: 1920,
-      height: 1080,
-      fps: 60,
-      fitStreamResolution: true,
+      fps: 30,
+      maxReconnects: 5,
+      reconnectDelay: 3000,
       nativeTouchEvents: true,
-      authenticate: Boolean(accessToken),
-      accessToken: accessToken || undefined,
-      onStart: (_message: StreamEvent) => updateStatus('RTX 스트림 연결됨'),
+      onStart: (message: StreamEvent) => { if (message.status === 'success') updateStatus('RTX 스트림 연결됨'); },
       onStop: (_message: StreamEvent) => updateStatus('스트림 종료됨'),
       onTerminate: (_message: StreamEvent) => updateStatus('세션 종료됨'),
       onUpdate: (message: StreamEvent) => console.debug('Omniverse update', message),
@@ -50,6 +45,10 @@ async function connect(): Promise<void> {
     console.error(error);
   }
 }
+
+video.addEventListener('playing', () => {
+  updateStatus('RTX 스트림 재생 중 · ' + video.videoWidth + '×' + video.videoHeight);
+});
 
 window.addEventListener('beforeunload', () => {
   void AppStreamer.terminate(false).catch(() => undefined);

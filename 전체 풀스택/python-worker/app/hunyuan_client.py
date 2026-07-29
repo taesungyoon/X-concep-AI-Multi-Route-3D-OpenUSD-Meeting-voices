@@ -19,7 +19,7 @@ class ShapeGenerationClient:
     def generate(self, image_path: Path, output_path: Path) -> dict[str, Any]:
         if self.settings.hunyuan_mode == "mock":
             raise RuntimeError("mock 3D 생성은 generator.generate_3d_mock 경로를 사용해야 함")
-        if self.settings.hunyuan_mode not in {"local_api", "triposr"}:
+        if self.settings.hunyuan_mode not in {"hunyuan3d", "local_api", "triposr"}:
             raise RuntimeError(f"지원하지 않는 SHAPE_MODE: {self.settings.hunyuan_mode}")
         if not image_path.exists():
             raise FileNotFoundError(f"선택된 2D 이미지가 없음: {image_path}")
@@ -29,7 +29,7 @@ class ShapeGenerationClient:
         endpoint = f"{self.settings.hunyuan_api_url}/generate"
         timeout = httpx.Timeout(float(self.settings.hunyuan_timeout_seconds), connect=30.0)
         with httpx.Client(timeout=timeout) as client:
-            response = client.post(endpoint, json=payload)
+            response = client.post(endpoint, json=payload, headers=self._auth_headers())
             response.raise_for_status()
             content_type = response.headers.get("content-type", "").lower()
             if "model/gltf-binary" in content_type or "application/octet-stream" in content_type:
@@ -49,7 +49,8 @@ class ShapeGenerationClient:
                 url = str(data[key])
                 if url.startswith("/"):
                     url = urljoin(self.settings.hunyuan_api_url + "/", url.lstrip("/"))
-                response = client.get(url)
+                headers = self._auth_headers() if url.startswith(self.settings.hunyuan_api_url + "/") else {}
+                response = client.get(url, headers=headers)
                 response.raise_for_status()
                 output_path.write_bytes(response.content)
                 return
@@ -64,6 +65,11 @@ class ShapeGenerationClient:
                     shutil.copy2(candidate, output_path)
                     return
         raise RuntimeError("이미지-3D API 응답에서 GLB 파일을 찾을 수 없음")
+
+    def _auth_headers(self) -> dict[str, str]:
+        if not self.settings.shape_api_key:
+            return {}
+        return {"Authorization": f"Bearer {self.settings.shape_api_key}"}
 
 
 def _safe_metadata(data: dict[str, Any]) -> dict[str, Any]:

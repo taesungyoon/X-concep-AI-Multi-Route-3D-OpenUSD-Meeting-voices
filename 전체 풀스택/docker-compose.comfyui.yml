@@ -1,0 +1,56 @@
+services:
+  comfyui:
+    image: xconcep-comfyui:hunyuan3d-2.1-persistent
+    build:
+      context: ../../ComfyUI
+      dockerfile: Dockerfile.dgx-spark
+    gpus: all
+    ipc: host
+    ports:
+      - "127.0.0.1:8188:8188"
+    volumes:
+      - ../../ComfyUI/models:/opt/comfyui/models:ro
+      - ../../ComfyUI/input:/opt/comfyui/input
+      - ../../ComfyUI/output:/opt/comfyui/output
+      - ../../ComfyUI/temp:/opt/comfyui/temp
+      - ../../ComfyUI/user:/opt/comfyui/user
+      - ../../ComfyUI/cache/huggingface:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8188/system_stats', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 60
+      start_period: 60s
+    restart: unless-stopped
+
+  python-worker:
+    environment:
+      COMFYUI_BASE_URL: http://comfyui:8188
+      SHAPE_MODE: hunyuan3d
+      SHAPE_PROVIDER: comfyui_hunyuan3d
+      SHAPE_API_URL: http://shape-adapter:8081
+      SHAPE_API_KEY: ${SHAPE_API_KEY:-}
+    depends_on:
+      comfyui: {condition: service_healthy}
+      shape-adapter: {condition: service_healthy}
+  shape-adapter:
+    build:
+      context: ./python-worker
+    command: ["uvicorn", "app.shape_adapter:app", "--host", "0.0.0.0", "--port", "8081"]
+    environment:
+      COMFYUI_BASE_URL: http://comfyui:8188
+      SHAPE_API_KEY: ${SHAPE_API_KEY:-}
+      SHAPE_TIMEOUT_SECONDS: ${SHAPE_TIMEOUT_SECONDS:-1800}
+      HUNYUAN_MODEL: ${HUNYUAN_MODEL:-tencent/Hunyuan3D-2.1/hunyuan3d-dit-v2-1}
+      HUNYUAN_STEPS: ${HUNYUAN_STEPS:-80}
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      comfyui: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped

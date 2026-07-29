@@ -1,6 +1,6 @@
 # X concep Omniverse WebRTC Client
 
-NVIDIA OV Web RTC Library `6.4.4`의 공식 `StreamType.DIRECT` 계약을 사용하는 TypeScript Client임.
+NVIDIA OV Web RTC Library `6.6.0`의 공식 `StreamType.DIRECT` 계약을 사용하는 TypeScript Client임.
 
 ```bash
 npm install
@@ -11,9 +11,16 @@ npm run dev
 접속 예시임.
 
 ```text
-http://localhost:5173/?server=192.168.0.20&signalingPort=49100&mediaPort=47998
+http://localhost:5173/?server=192.168.0.20&signalingPort=49100
 ```
 
-Reverse Proxy에서 JWT 인증을 적용한 경우 `accessToken` Query 값을 전달할 수 있으나, 운영 환경에서는 URL Query에 장기 토큰을 직접 노출하지 않고 단기 세션 토큰 발급 API를 적용해야 함.
+standalone `ovstream` Direct 연결은 signaling port만 명시하며 media port는 SDP/ICE 협상으로 결정함.
+
+
+서버와 `npm run dev`를 실행한 뒤 실제 브라우저 디코딩까지 검사함.
+
+```bash
+E2E_BASE_URL='http://127.0.0.1:5173/?server=127.0.0.1&signalingPort=49100' npm run test:e2e
+```
 
 NVIDIA Web SDK와 Kit Runtime의 호환성 매트릭스를 기준으로 버전을 함께 고정해야 함.

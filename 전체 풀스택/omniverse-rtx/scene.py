@@ -1,14 +1,37 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 
 RENDER_PRODUCT_PATH = "/Render/OVServer/ViewportTexture0"
 
 
-def validation_stage_usda(width: int, height: int) -> str:
+def validation_stage_usda(
+    width: int, height: int, asset_path: str | Path | None = None
+) -> str:
     """Build a self-contained stage used for renderer and stream readiness."""
     safe_width = max(1, int(width))
     safe_height = max(1, int(height))
     vertical_aperture = 20.955 * safe_height / safe_width
+    if asset_path is None:
+        inspection_part = '''def Sphere "InspectionPart"
+    {
+        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
+        color3f[] primvars:displayColor = [(0.08, 0.55, 0.95)]
+        double radius = 50
+        double3 xformOp:translate = (0, 55, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }'''
+    else:
+        resolved_asset = Path(asset_path).expanduser().resolve()
+        if not resolved_asset.is_file():
+            raise FileNotFoundError(f"USD asset not found: {resolved_asset}")
+        asset_uri = resolved_asset.as_posix().replace("@", "%40")
+        inspection_part = f'''def Xform "InspectionPart" (
+        prepend references = @{asset_uri}@
+    )
+    {{
+    }}'''
     return f'''#usda 1.0
 (
     defaultPrim = "World"
@@ -18,14 +41,7 @@ def validation_stage_usda(width: int, height: int) -> str:
 
 def Xform "World"
 {{
-    def Sphere "InspectionPart"
-    {{
-        float3[] extent = [(-50, -50, -50), (50, 50, 50)]
-        color3f[] primvars:displayColor = [(0.08, 0.55, 0.95)]
-        double radius = 50
-        double3 xformOp:translate = (0, 55, 0)
-        uniform token[] xformOpOrder = ["xformOp:translate"]
-    }}
+    {inspection_part}
 
     def Cube "MachineBase"
     {{

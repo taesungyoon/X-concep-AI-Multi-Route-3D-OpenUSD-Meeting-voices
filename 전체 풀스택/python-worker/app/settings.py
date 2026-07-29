@@ -70,6 +70,7 @@ class Settings:
     hunyuan_mode: str
     shape_provider: str
     hunyuan_api_url: str
+    shape_api_key: str
     hunyuan_timeout_seconds: int
     hunyuan_texture: bool
     openscad_mode: str
@@ -149,7 +150,7 @@ def get_settings() -> Settings:
         vllm_base_url=os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000/v1").rstrip("/"),
         vllm_api_key=os.getenv("VLLM_API_KEY", "local-not-required"),
         gemma_model_name=os.getenv("GEMMA_MODEL_NAME", "gemma-4-64b-local"),
-        llm_timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "180")),
+        llm_timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "600")),
         # OPENAI_IMAGE_MODE chooses the provider even though legacy variable
         # names retain the openai_image_* prefix for compatibility.
         openai_image_mode=os.getenv("OPENAI_IMAGE_MODE", "comfyui").strip().lower(),
@@ -190,6 +191,7 @@ def get_settings() -> Settings:
         hunyuan_mode=os.getenv("SHAPE_MODE", os.getenv("HUNYUAN_MODE", "triposr")).strip().lower(),
         shape_provider=os.getenv("SHAPE_PROVIDER", "triposr").strip().lower(),
         hunyuan_api_url=os.getenv("SHAPE_API_URL", os.getenv("HUNYUAN_API_URL", "http://127.0.0.1:8081")).rstrip("/"),
+        shape_api_key=os.getenv("SHAPE_API_KEY", "").strip(),
         hunyuan_timeout_seconds=int(os.getenv("SHAPE_TIMEOUT_SECONDS", os.getenv("HUNYUAN_TIMEOUT_SECONDS", "1800"))),
         hunyuan_texture=_bool("SHAPE_TEXTURE", _bool("HUNYUAN_TEXTURE", True)),
         openscad_mode=os.getenv("OPENSCAD_MODE", "auto").strip().lower(),

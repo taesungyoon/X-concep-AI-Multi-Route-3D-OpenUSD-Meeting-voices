@@ -610,13 +610,13 @@ class GenerationPipeline:
         llm_connected = (
             True
             if self.settings.llm_mode == "rules"
-            else self._probe_http(self.settings.vllm_base_url, "/models")
+            else self._probe_http(self.settings.vllm_base_url, "/models", self.settings.vllm_api_key)
             if self.settings.llm_mode != "mock"
             else False
         )
-        hunyuan_connected = self._probe_http(self.settings.hunyuan_api_url, "/health") if self.settings.hunyuan_mode != "mock" else False
+        hunyuan_connected = self._probe_http(self.settings.hunyuan_api_url, "/health", self.settings.shape_api_key) if self.settings.hunyuan_mode != "mock" else False
         if self.settings.speech_mode == "nvidia_nim":
-            speech_connected = self._probe_http(self.settings.nvidia_asr_url, "/health/ready")
+            speech_connected = self._probe_http(self.settings.nvidia_asr_url, "/health/ready", self.settings.nvidia_asr_api_key)
         elif self.settings.speech_mode == "faster_whisper":
             speech_connected = importlib.util.find_spec("faster_whisper") is not None
         elif self.settings.speech_mode == "nemo_asr":
@@ -624,7 +624,7 @@ class GenerationPipeline:
         else:
             speech_connected = False
         image_connected = (
-            self._probe_http(self.settings.comfyui_base_url, "/system_stats")
+            self._probe_http(self.settings.comfyui_base_url, "/system_stats", self.settings.comfyui_api_key)
             if self.settings.openai_image_mode == "comfyui"
             else None
         )
@@ -697,11 +697,12 @@ class GenerationPipeline:
         }
 
     @staticmethod
-    def _probe_http(base_url: str, path: str) -> bool:
+    def _probe_http(base_url: str, path: str, api_key: str = "") -> bool:
         try:
             with httpx.Client(timeout=1.5) as client:
-                response = client.get(base_url.rstrip("/") + path)
-                return response.status_code < 500
+                headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+                response = client.get(base_url.rstrip("/") + path, headers=headers)
+                return response.is_success
         except Exception:
             return False
 
